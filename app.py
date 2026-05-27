@@ -655,11 +655,12 @@ with tab4:
     # ── AI 분석 함수 ─────────────────────────────────────────
     def _analyze_meal_with_ai(menu: str, school_type: str, api_key: str) -> dict:
         try:
-            import anthropic
+            import google.generativeai as genai
         except ImportError:
-            return {"error": "anthropic 패키지가 설치되지 않았습니다."}
+            return {"error": "google-generativeai 패키지가 설치되지 않았습니다."}
 
-        client = anthropic.Anthropic(api_key=api_key)
+        genai.configure(api_key=api_key)
+        model = genai.GenerativeModel("gemini-1.5-flash")
         prompt = f"""오늘 {school_type} 점심 급식 메뉴입니다:
 {menu}
 
@@ -680,12 +681,8 @@ with tab4:
 }}"""
 
         try:
-            msg = client.messages.create(
-                model="claude-haiku-4-5-20251001",
-                max_tokens=1024,
-                messages=[{"role": "user", "content": prompt}],
-            )
-            raw = msg.content[0].text.strip()
+            response = model.generate_content(prompt)
+            raw = response.text.strip()
             if "```json" in raw:
                 raw = raw.split("```json")[1].split("```")[0].strip()
             elif "```" in raw:
@@ -697,9 +694,9 @@ with tab4:
     # ── 주간 급식 요약 분석 함수 ──────────────────────────────
     def _weekly_report_with_ai(week_meals: dict, school_type: str, api_key: str) -> str:
         try:
-            import anthropic
+            import google.generativeai as genai
         except ImportError:
-            return "anthropic 패키지가 필요합니다."
+            return "google-generativeai 패키지가 필요합니다."
 
         meals_text = "\n".join(
             f"{ymd[4:6]}월 {ymd[6:8]}일: {v.get('menu','급식없음')}"
@@ -708,7 +705,8 @@ with tab4:
         if not meals_text:
             return "이번 주 급식 데이터가 없습니다."
 
-        client = anthropic.Anthropic(api_key=api_key)
+        genai.configure(api_key=api_key)
+        model = genai.GenerativeModel("gemini-1.5-flash")
         prompt = f"""이번 주 {school_type} 급식 메뉴입니다:
 {meals_text}
 
@@ -716,12 +714,8 @@ with tab4:
 부족한 영양소와 가정에서 보완할 수 있는 방법을 포함해주세요."""
 
         try:
-            msg = client.messages.create(
-                model="claude-haiku-4-5-20251001",
-                max_tokens=512,
-                messages=[{"role": "user", "content": prompt}],
-            )
-            return msg.content[0].text.strip()
+            response = model.generate_content(prompt)
+            return response.text.strip()
         except Exception as e:
             return f"오류: {e}"
 
@@ -734,12 +728,12 @@ with tab4:
     )
 
     # API 키 입력
-    with st.expander("🔑 Claude AI API 키 설정", expanded="t4_api_key" not in st.session_state):
+    with st.expander("🔑 Gemini AI API 키 설정", expanded="t4_api_key" not in st.session_state):
         api_key_input = st.text_input(
-            "Anthropic API Key",
+            "Google AI API Key",
             type="password",
-            placeholder="sk-ant-...",
-            help="https://console.anthropic.com 에서 발급",
+            placeholder="AIza...",
+            help="https://aistudio.google.com/apikey 에서 무료 발급",
             key="t4_api_key_input",
         )
         if api_key_input:
@@ -748,15 +742,15 @@ with tab4:
 
     # Streamlit secrets 우선 사용 (없으면 직접 입력한 키 사용)
     try:
-        _secret_key = st.secrets.get("ANTHROPIC_API_KEY", "")
+        _secret_key = st.secrets.get("GEMINI_API_KEY", "")
     except Exception:
         _secret_key = ""
     final_api_key = _secret_key or st.session_state.get("t4_api_key", "")
 
     if not final_api_key:
-        st.info("위에서 Claude AI API 키를 입력하면 맞춤 식단 분석이 시작됩니다.")
+        st.info("위에서 Gemini AI API 키를 입력하면 맞춤 식단 분석이 시작됩니다.")
         st.markdown(
-            "[🔗 API 키 발급 받기](https://console.anthropic.com) · 무료 크레딧으로 바로 사용 가능"
+            "[🔗 무료 API 키 발급 받기](https://aistudio.google.com/apikey) · Google AI Studio에서 무료 발급"
         )
     else:
         # 오늘 점심 급식 조회
