@@ -2,7 +2,7 @@
 급식알리미 - Streamlit 웹 버전
 meal.py의 급식 조회/칼로리 분석 기능을 웹에서 제공합니다.
 """
-import sys, types, re, calendar
+import sys, types, re, calendar, json
 from datetime import datetime, timedelta
 
 # ──────────────────────────────────────────────────────────
@@ -287,7 +287,7 @@ st.markdown(
 )
 
 # 탭 구성
-tab1, tab2, tab3 = st.tabs(["📅 오늘의 급식", "📋 주간 급식", "📊 월별 칼로리 분석"])
+tab1, tab2, tab3, tab4 = st.tabs(["📅 오늘의 급식", "📋 주간 급식", "📊 월별 칼로리 분석", "🥗 맞춤 식단"])
 
 # ══════════════════════════════════════════════════════════
 # TAB 1: 오늘의 급식
@@ -647,3 +647,295 @@ with tab3:
 
     else:
         st.info("위에서 연도와 월을 선택한 뒤 '분석 시작' 버튼을 클릭하세요.")
+
+# ══════════════════════════════════════════════════════════
+# TAB 4: 맞춤 식단 추천
+# ══════════════════════════════════════════════════════════
+with tab4:
+    # ── AI 분석 함수 ─────────────────────────────────────────
+    def _analyze_meal_with_ai(menu: str, school_type: str, api_key: str) -> dict:
+        try:
+            import anthropic
+        except ImportError:
+            return {"error": "anthropic 패키지가 설치되지 않았습니다."}
+
+        client = anthropic.Anthropic(api_key=api_key)
+        prompt = f"""오늘 {school_type} 점심 급식 메뉴입니다:
+{menu}
+
+위 급식의 영양 구성을 분석하고, 아래 JSON 형식으로만 응답해주세요 (다른 텍스트 없이):
+{{
+  "nutrition_summary": "이 급식의 영양 구성 한 줄 요약",
+  "missing_nutrients": ["부족한 영양소1", "부족한 영양소2", "부족한 영양소3"],
+  "dinner": {{
+    "menu": "저녁 추천 메뉴 (예: 현미밥 + 닭가슴살 구이)",
+    "reason": "추천 이유 한 문장"
+  }},
+  "snack": {{
+    "menu": "간식 추천 (예: 방울토마토)",
+    "reason": "추천 이유 한 문장"
+  }},
+  "shopping_list": ["재료1", "재료2", "재료3", "재료4", "재료5"],
+  "weekly_tip": "이번 주 영양 균형을 위한 한 줄 조언"
+}}"""
+
+        try:
+            msg = client.messages.create(
+                model="claude-haiku-4-5-20251001",
+                max_tokens=1024,
+                messages=[{"role": "user", "content": prompt}],
+            )
+            raw = msg.content[0].text.strip()
+            if "```json" in raw:
+                raw = raw.split("```json")[1].split("```")[0].strip()
+            elif "```" in raw:
+                raw = raw.split("```")[1].split("```")[0].strip()
+            return json.loads(raw)
+        except Exception as e:
+            return {"error": str(e)}
+
+    # ── 주간 급식 요약 분석 함수 ──────────────────────────────
+    def _weekly_report_with_ai(week_meals: dict, school_type: str, api_key: str) -> str:
+        try:
+            import anthropic
+        except ImportError:
+            return "anthropic 패키지가 필요합니다."
+
+        meals_text = "\n".join(
+            f"{ymd[4:6]}월 {ymd[6:8]}일: {v.get('menu','급식없음')}"
+            for ymd, v in sorted(week_meals.items()) if v.get("menu")
+        )
+        if not meals_text:
+            return "이번 주 급식 데이터가 없습니다."
+
+        client = anthropic.Anthropic(api_key=api_key)
+        prompt = f"""이번 주 {school_type} 급식 메뉴입니다:
+{meals_text}
+
+이번 주 급식의 영양 균형을 평가하고, 학부모에게 전달하는 간결한 주간 리포트를 3~4문장으로 작성해주세요.
+부족한 영양소와 가정에서 보완할 수 있는 방법을 포함해주세요."""
+
+        try:
+            msg = client.messages.create(
+                model="claude-haiku-4-5-20251001",
+                max_tokens=512,
+                messages=[{"role": "user", "content": prompt}],
+            )
+            return msg.content[0].text.strip()
+        except Exception as e:
+            return f"오류: {e}"
+
+    # ── UI ───────────────────────────────────────────────────
+    st.markdown(
+        f"<div style='background:{clr};border-radius:12px;padding:16px 20px;"
+        f"margin-bottom:16px;'>"
+        f"<h2 style='color:white;margin:0;text-align:center;'>🥗 맞춤 식단 추천</h2></div>",
+        unsafe_allow_html=True,
+    )
+
+    # API 키 입력
+    with st.expander("🔑 Claude AI API 키 설정", expanded="t4_api_key" not in st.session_state):
+        api_key_input = st.text_input(
+            "Anthropic API Key",
+            type="password",
+            placeholder="sk-ant-...",
+            help="https://console.anthropic.com 에서 발급",
+            key="t4_api_key_input",
+        )
+        if api_key_input:
+            st.session_state["t4_api_key"] = api_key_input
+            st.success("API 키가 설정되었습니다.")
+
+    # Streamlit secrets 우선 사용 (없으면 직접 입력한 키 사용)
+    try:
+        _secret_key = st.secrets.get("ANTHROPIC_API_KEY", "")
+    except Exception:
+        _secret_key = ""
+    final_api_key = _secret_key or st.session_state.get("t4_api_key", "")
+
+    if not final_api_key:
+        st.info("위에서 Claude AI API 키를 입력하면 맞춤 식단 분석이 시작됩니다.")
+        st.markdown(
+            "[🔗 API 키 발급 받기](https://console.anthropic.com) · 무료 크레딧으로 바로 사용 가능"
+        )
+    else:
+        # 오늘 점심 급식 조회
+        with st.spinner("오늘 급식 불러오는 중..."):
+            t4_data, t4_err = fetch_meal(
+                st.session_state.cur_date,
+                school["office"],
+                school["code"],
+            )
+
+        lunch_menu = t4_data.get(2, {}).get("menu", "") if t4_data else ""
+        lunch_kcal = t4_data.get(2, {}).get("kcal", "") if t4_data else ""
+
+        # 오늘 점심 카드
+        st.markdown("#### 📌 오늘 점심 급식")
+        if lunch_menu:
+            kcal_clean = re.sub(r'\(해당.*?\)', '', lunch_kcal).strip()
+            st.markdown(
+                f"<div class='meal-card' style='border-left:4px solid {clr};'>"
+                f"<div class='meal-menu'>{lunch_menu}</div>"
+                f"{'<div style=\"color:#888;font-size:13px;margin-top:6px;\">🔥 ' + kcal_clean + '</div>' if kcal_clean else ''}"
+                f"</div>",
+                unsafe_allow_html=True,
+            )
+        else:
+            st.info("오늘 급식 데이터가 없습니다. 날짜를 확인해주세요.")
+
+        st.markdown("---")
+
+        # AI 분석 버튼
+        col_btn1, col_btn2 = st.columns(2)
+        with col_btn1:
+            run_analysis = st.button(
+                "🤖 AI 보완 식단 분석", type="primary",
+                use_container_width=True, key="t4_run",
+                disabled=not lunch_menu,
+            )
+        with col_btn2:
+            run_weekly = st.button(
+                "📋 주간 리포트 생성", use_container_width=True, key="t4_weekly",
+            )
+
+        # ── AI 보완 식단 분석 결과 ────────────────────────────
+        if run_analysis and lunch_menu:
+            with st.spinner("🤖 Claude AI가 급식을 분석하는 중..."):
+                result = _analyze_meal_with_ai(
+                    lunch_menu, school.get("type", "초등학교"), final_api_key
+                )
+            st.session_state["t4_result"] = result
+
+        if "t4_result" in st.session_state:
+            result = st.session_state["t4_result"]
+
+            if "error" in result:
+                st.error(f"분석 오류: {result['error']}")
+            else:
+                # 영양 분석 요약
+                st.markdown(
+                    f"<div class='meal-card' style='background:#F0F7EE;"
+                    f"border-left:4px solid {clr};'>"
+                    f"<div class='meal-title' style='color:{clr};'>🤖 AI 보완 식단</div>"
+                    f"<div style='color:#444;margin:4px 0;'>{result.get('nutrition_summary','')}</div>"
+                    f"<div style='margin-top:8px;'>"
+                    + "".join(
+                        f"<span style='background:{clr}22;color:{clr};border-radius:12px;"
+                        f"padding:3px 10px;font-size:13px;margin:2px;display:inline-block;'>"
+                        f"⚠️ {n} 부족</span>"
+                        for n in result.get("missing_nutrients", [])
+                    )
+                    + "</div></div>",
+                    unsafe_allow_html=True,
+                )
+
+                col_d, col_s = st.columns(2)
+
+                # 저녁 추천
+                dinner = result.get("dinner", {})
+                with col_d:
+                    st.markdown(
+                        f"<div class='meal-card' style='border-left:4px solid #5C6BC0;'>"
+                        f"<div class='meal-title' style='color:#5C6BC0;'>🌙 저녁 추천</div>"
+                        f"<div style='font-size:16px;font-weight:bold;margin:6px 0;'>"
+                        f"{dinner.get('menu','')}</div>"
+                        f"<div style='color:#888;font-size:13px;'>{dinner.get('reason','')}</div>"
+                        f"</div>",
+                        unsafe_allow_html=True,
+                    )
+
+                # 간식 추천
+                snack = result.get("snack", {})
+                with col_s:
+                    st.markdown(
+                        f"<div class='meal-card' style='border-left:4px solid #FF8C00;'>"
+                        f"<div class='meal-title' style='color:#FF8C00;'>🍎 간식 추천</div>"
+                        f"<div style='font-size:16px;font-weight:bold;margin:6px 0;'>"
+                        f"{snack.get('menu','')}</div>"
+                        f"<div style='color:#888;font-size:13px;'>{snack.get('reason','')}</div>"
+                        f"</div>",
+                        unsafe_allow_html=True,
+                    )
+
+                # 장보기 목록
+                shopping = result.get("shopping_list", [])
+                st.markdown(
+                    f"<div class='meal-card'>"
+                    f"<div class='meal-title'>🛒 장보기 목록 ({len(shopping)}개 항목)</div>"
+                    + "".join(
+                        f"<div style='padding:6px 0;border-bottom:1px solid #F0F0F0;"
+                        f"font-size:15px;'>✅ {item}</div>"
+                        for item in shopping
+                    )
+                    + "</div>",
+                    unsafe_allow_html=True,
+                )
+
+                # 가족에게 공유
+                share_text = f"""📋 [{date_label(st.session_state.cur_date)}] {school['name']} 급식 분석
+
+🍚 오늘 점심:
+{lunch_menu}
+{('🔥 ' + re.sub(r'\\(해당.*?\\)', '', lunch_kcal).strip()) if lunch_kcal else ''}
+
+🤖 AI 분석: {result.get('nutrition_summary','')}
+⚠️ 보완 필요: {', '.join(result.get('missing_nutrients', []))}
+
+🌙 저녁 추천: {dinner.get('menu','')}
+🍎 간식 추천: {snack.get('menu','')}
+
+🛒 장보기: {', '.join(shopping)}
+
+💡 {result.get('weekly_tip','')}"""
+
+                with st.expander("📤 가족에게 공유", expanded=False):
+                    st.text_area(
+                        "아래 내용을 복사해서 공유하세요",
+                        value=share_text,
+                        height=250,
+                        key="t4_share",
+                    )
+                    st.caption("📋 위 텍스트를 선택 → 복사 후 카카오톡/문자로 전송하세요")
+
+                # 조언
+                tip = result.get("weekly_tip", "")
+                if tip:
+                    st.markdown(
+                        f"<div style='background:#FFFDE7;border:1px solid #FFD54F;"
+                        f"border-radius:10px;padding:12px 16px;margin-top:8px;"
+                        f"font-size:14px;color:#555;'>"
+                        f"💡 <b>오늘의 영양 조언</b><br>{tip}</div>",
+                        unsafe_allow_html=True,
+                    )
+
+        # ── 주간 리포트 ───────────────────────────────────────
+        if run_weekly:
+            with st.spinner("📋 이번 주 급식 분석 중..."):
+                w_data, w_err = fetch_week_meals(
+                    st.session_state.week_monday,
+                    school["office"],
+                    school["code"],
+                )
+                if w_err:
+                    st.error(f"주간 데이터 오류: {w_err}")
+                elif not any(v.get("menu") for v in w_data.values()):
+                    st.info("이번 주 급식 데이터가 없습니다.")
+                else:
+                    report_text = _weekly_report_with_ai(
+                        w_data, school.get("type", "초등학교"), final_api_key
+                    )
+                    st.session_state["t4_weekly_report"] = report_text
+
+        if "t4_weekly_report" in st.session_state:
+            st.markdown("---")
+            monday_label = st.session_state.week_monday.strftime("%m월 %d일")
+            friday_label = (st.session_state.week_monday + timedelta(days=4)).strftime("%m월 %d일")
+            st.markdown(
+                f"<div class='meal-card' style='border-left:4px solid {clr};'>"
+                f"<div class='meal-title' style='color:{clr};'>"
+                f"📅 주간 리포트 ({monday_label} ~ {friday_label})</div>"
+                f"<div style='font-size:15px;line-height:1.8;color:#333;white-space:pre-line;'>"
+                f"{st.session_state['t4_weekly_report']}</div></div>",
+                unsafe_allow_html=True,
+            )
