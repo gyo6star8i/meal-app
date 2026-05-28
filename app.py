@@ -1299,10 +1299,34 @@ with tab4:
 
     # ── UI ───────────────────────────────────────────────────
     st.markdown(
-        f"<div style='background:{clr};border-radius:12px;padding:16px 20px;"
-        f"margin-bottom:16px;'>"
-        f"<p style='color:white;margin:0;text-align:center;font-size:24px;"
-        f"font-weight:700;'>🥗 오늘의 급식 및 맞춤 식단 추천</p></div>",
+        f"""<style>
+        #t4-main-head {{
+            background: {clr};
+            border-radius: 12px;
+            padding: 0;
+            margin-bottom: 16px;
+            overflow: hidden;
+        }}
+        #t4-main-head h2 {{
+            color: white !important;
+            text-align: center;
+            margin: 0;
+            padding: 16px 20px;
+            font-size: 24px;
+            position: relative;
+        }}
+        #t4-main-head h2 a {{
+            position: absolute;
+            inset: 0;
+            display: block;
+            font-size: 0;
+            line-height: 0;
+            color: transparent;
+        }}
+        </style>
+        <div id="t4-main-head">
+        <h2>🥗 오늘의 급식 및 맞춤 식단 추천</h2>
+        </div>""",
         unsafe_allow_html=True,
     )
 
