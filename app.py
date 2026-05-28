@@ -531,7 +531,7 @@ st.markdown(
 )
 
 # 탭 구성
-tab1, tab2, tab3, tab4 = st.tabs(["📅 오늘의 급식", "📋 주간 급식", "📊 월별 칼로리 분석", "🥗 맞춤 식단"])
+tab1, tab2, tab3, tab4 = st.tabs(["📅 오늘의 급식", "📋 주간 급식", "📊 월별 칼로리 분석", "🥗 오늘의 급식 및 맞춤 식단 추천"])
 
 # ══════════════════════════════════════════════════════════
 # TAB 1: 오늘의 급식
@@ -1301,7 +1301,8 @@ with tab4:
     st.markdown(
         f"<div style='background:{clr};border-radius:12px;padding:16px 20px;"
         f"margin-bottom:16px;'>"
-        f"<h2 style='color:white;margin:0;text-align:center;'>🥗 맞춤 식단 추천</h2></div>",
+        f"<p style='color:white;margin:0;text-align:center;font-size:24px;"
+        f"font-weight:700;'>🥗 오늘의 급식 및 맞춤 식단 추천</p></div>",
         unsafe_allow_html=True,
     )
 
