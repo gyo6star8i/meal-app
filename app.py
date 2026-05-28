@@ -787,19 +787,112 @@ with tab4:
                 pass
             return {}
 
-        # ② 다단계 검색: 전체→앞2글자제거→앞4글자제거→뒤3글자
-        # 예) 근대된장국→된장국→장국  /  춘천닭갈비→닭갈비→갈비
-        candidates = [clean]
-        if len(clean) > 4:
-            candidates.append(clean[2:])   # 앞 2글자 제거 (지역·재료 수식어 제거)
-        if len(clean) > 6:
-            candidates.append(clean[4:])   # 앞 4글자 제거
-        if len(clean) > 3:
-            candidates.append(clean[-3:])  # 뒤 3글자 (음식 종류 키워드)
-        if len(clean) > 2:
-            candidates.append(clean[-2:])  # 뒤 2글자 (최후 수단)
+        # ② 동의어/유사어 매핑 (API에 없는 음식을 가장 유사한 DB 항목으로 매핑)
+        # 실험으로 확인한 API 수록 식품 기준 매핑표
+        SYNONYM_MAP = {
+            # 국/탕 류: 된장국→된장찌개, 국 접미사→찌개
+            "된장국": "된장찌개", "근대된장국": "된장찌개", "아욱된장국": "된장찌개",
+            "미역국": "미역국", "김치국": "김치찌개", "갈비탕": "갈비탕",
+            # 닭 류
+            "닭갈비": "닭볶음탕", "춘천닭갈비": "닭볶음탕", "닭볶음": "닭볶음탕",
+            "찜닭": "닭볶음탕",
+            # 튀김 류 (야채튀김→오징어튀김으로 열량 비슷)
+            "야채튀김": "오징어튀김", "혼합튀김": "오징어튀김",
+            "두부튀김": "두부조림",
+            # 찜 류
+            "고추찜": "고추장볶음", "애기고추찜": "고추장볶음",
+            "계란찜": "달걀찜", "달걀찜": "달걀찜",
+            # 우유·유제품
+            "우유": "우유",           # 아래 hardcoded fallback 사용
+            "저지방우유": "우유",
+            "흰우유": "우유",
+            # 요거트·샐러드
+            "요거트": "요거트",       # hardcoded fallback
+            "샐러드": "과일샐러드",
+            "망고블루베리요거트샐러드": "과일샐러드",
+            "블루베리요거트샐러드": "과일샐러드",
+            # 기타
+            "제육볶음": "제육볶음", "떡볶이": "떡볶이",
+            "시금치나물": "시금치나물", "콩나물무침": "콩나물",
+        }
 
-        for candidate in candidates:
+        # 자주 등장하는 접미사 변환 (DB 수록 형태로)
+        SUFFIX_MAP = [
+            ("찌개",  "찌개"),   # 접미사가 이미 맞으면 그냥 유지
+            ("볶음",  "볶음"),
+            ("국",    "찌개"),   # 된장국→된장찌개
+            ("찜",    "볶음"),   # 고추찜→고추볶음
+            ("구이",  "구이"),
+            ("조림",  "조림"),
+            ("나물",  "나물"),
+            ("튀김",  "오징어튀김"),  # 특정 튀김 없으면 오징어튀김
+            ("갈비",  "갈비탕"),
+            ("닭",    "닭볶음탕"),
+        ]
+
+        # ③ 하드코딩 폴백 (API에 없는 필수 식품 기본 영양값)
+        HARDCODED = {
+            "우유": {"foodNm": "우유(표준)", "enerc": "63", "prot": "3.29",
+                     "fatce": "3.27", "chocdf": "4.78", "fibtg": "", "ca": "113",
+                     "nat": "42", "vitc": "0"},
+            "요거트": {"foodNm": "플레인요거트(표준)", "enerc": "61", "prot": "3.47",
+                      "fatce": "3.25", "chocdf": "4.66", "fibtg": "", "ca": "121",
+                      "nat": "46", "vitc": "0"},
+        }
+
+        # ④ 후보 목록 구성
+        candidates = []
+
+        # 동의어 매핑 우선 적용
+        if clean in SYNONYM_MAP:
+            syn = SYNONYM_MAP[clean]
+            if syn in HARDCODED:
+                return HARDCODED[syn]
+            candidates.append(syn)
+
+        # 전체 이름
+        candidates.append(clean)
+
+        # 앞 수식어 제거 (2글자씩)
+        for skip in (2, 4):
+            if len(clean) > skip + 2:
+                trimmed = clean[skip:]
+                candidates.append(trimmed)
+                # 잘라낸 후에도 동의어 적용
+                if trimmed in SYNONYM_MAP:
+                    syn = SYNONYM_MAP[trimmed]
+                    if syn in HARDCODED:
+                        return HARDCODED[syn]
+                    candidates.append(syn)
+
+        # 접미사 기반 변환
+        for suffix, replacement in SUFFIX_MAP:
+            if clean.endswith(suffix) and clean != suffix:
+                base = clean[: -len(suffix)]
+                if base:
+                    new_name = base + replacement
+                    candidates.append(new_name)
+                    # 기본 유사 음식도 후보에 추가
+                    candidates.append(replacement)
+
+        # 뒤 3·2글자 (최후 수단)
+        if len(clean) > 3:
+            candidates.append(clean[-3:])
+        if len(clean) > 2:
+            candidates.append(clean[-2:])
+
+        # 중복 제거 (순서 유지)
+        seen = set()
+        unique = []
+        for c in candidates:
+            if c not in seen and len(c) >= 2:
+                seen.add(c)
+                unique.append(c)
+
+        for candidate in unique:
+            # 하드코딩 폴백 확인
+            if candidate in HARDCODED:
+                return HARDCODED[candidate]
             res = _do_query(candidate)
             if res:
                 return res
