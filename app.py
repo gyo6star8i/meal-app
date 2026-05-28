@@ -1117,6 +1117,45 @@ with tab2:
 
                     st.caption("🤖 Groq AI 추천 · 참고용 정보입니다")
 
+                    # ── 가족에게 공유 (장보기 위주) ──────────────
+                    _days_kr_full = ["월요일","화요일","수요일","목요일","금요일"]
+                    _share_lines = [
+                        f"🛒 [{_mon_lbl} ~ {_fri_lbl}] {school['name']} 주간 장보기 목록",
+                        "",
+                        "📅 이번 주 급식 메뉴",
+                    ]
+                    for _si in range(5):
+                        _sd = monday + timedelta(days=_si)
+                        _symd = _sd.strftime("%Y%m%d")
+                        _smeal = week_data.get(_symd, {})
+                        _smenu = _smeal.get("menu", "급식없음") if _smeal else "급식없음"
+                        _smenu_clean = re.sub(r"<[^>]+>", " ", _smenu).strip()
+                        _share_lines.append(
+                            f"  {_days_kr_full[_si]}({_sd.month}/{_sd.day}): {_smenu_clean}"
+                        )
+                    _share_lines += ["", "🛒 요일별 장보기 추천"]
+                    for _si, _day in enumerate(["월","화","수","목","금"]):
+                        _items_s = _shop.get(_day, [])
+                        if not _items_s:
+                            continue
+                        _sd = monday + timedelta(days=_si)
+                        _share_lines.append(f"\n📌 {_day}요일 ({_sd.month}/{_sd.day})")
+                        for _it in _items_s:
+                            _share_lines.append(
+                                f"  • {_it.get('item','')} — {_it.get('reason','')}"
+                            )
+                    _share_lines += ["", "🤖 Groq AI 추천 · 참고용 정보입니다"]
+                    _share_text = "\n".join(_share_lines)
+
+                    with st.expander("📤 가족에게 공유", expanded=False):
+                        st.text_area(
+                            "아래 내용을 복사해서 공유하세요",
+                            value=_share_text,
+                            height=300,
+                            key=f"t2_shop_share_{monday.strftime('%Y%m%d')}",
+                        )
+                        st.caption("📋 위 텍스트를 선택 → 복사 후 카카오톡/문자로 전송하세요")
+
 # ══════════════════════════════════════════════════════════
 # TAB 3: 월별 칼로리 분석
 # ══════════════════════════════════════════════════════════
