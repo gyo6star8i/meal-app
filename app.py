@@ -725,25 +725,27 @@ with tab4:
         unsafe_allow_html=True,
     )
 
-    # API 키 입력
-    with st.expander("🔑 Groq AI API 키 설정", expanded="t4_api_key" not in st.session_state):
-        api_key_input = st.text_input(
-            "Groq API Key",
-            type="password",
-            placeholder="gsk_...",
-            help="https://console.groq.com 에서 무료 발급",
-            key="t4_api_key_input",
-        )
-        if api_key_input:
-            st.session_state["t4_api_key"] = api_key_input
-            st.success("API 키가 설정되었습니다.")
-
     # Streamlit secrets 우선 사용 (없으면 직접 입력한 키 사용)
     try:
         _secret_key = st.secrets.get("GROQ_API_KEY", "")
     except Exception:
         _secret_key = ""
     final_api_key = _secret_key or st.session_state.get("t4_api_key", "")
+
+    # secrets에 키가 없을 때만 입력창 표시
+    if not _secret_key:
+        with st.expander("🔑 Groq AI API 키 설정", expanded="t4_api_key" not in st.session_state):
+            api_key_input = st.text_input(
+                "Groq API Key",
+                type="password",
+                placeholder="gsk_...",
+                help="https://console.groq.com 에서 무료 발급",
+                key="t4_api_key_input",
+            )
+            if api_key_input:
+                st.session_state["t4_api_key"] = api_key_input
+                final_api_key = api_key_input
+                st.success("API 키가 설정되었습니다.")
 
     if not final_api_key:
         st.info("위에서 Groq API 키를 입력하면 맞춤 식단 분석이 시작됩니다.")
