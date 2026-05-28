@@ -252,22 +252,62 @@ _SGG_MAP = {
 }
 
 
+def _clean_school_name(name: str) -> str:
+    """괄호 접두사·학교급 접미사 제거 후 정규화"""
+    import re as _re
+    name = _re.sub(r"^\([^)]+\)\s*", "", name)   # (경북), (경기) 등 괄호 접두사 제거
+    for suffix in ["초등학교", "중학교", "고등학교", "특수학교", "유치원"]:
+        name = name.replace(suffix, "")
+    return name.strip()
+
+
 def _get_sgg_candidates(school_name: str, sido: str) -> list:
-    """학교명 키워드로 시군구코드 후보 추출 (긴 키워드 우선)"""
+    """학교명 키워드로 시군구코드 후보 추출 (긴 키워드 우선).
+    매칭 없으면 해당 sido의 전체 sgg 코드 목록을 반환(fallback).
+    """
     sgg_map = _SGG_MAP.get(sido, {})
-    # 학교급 접미어 제거
-    clean = (school_name
-             .replace("초등학교", "").replace("중학교", "")
-             .replace("고등학교", "").replace("특수학교", "")
-             .replace("유치원", ""))
+    clean = _clean_school_name(school_name)
     for kw, codes in sorted(sgg_map.items(), key=lambda x: -len(x[0])):
         if kw in clean:
             return codes
-    return []
+    # fallback: 시/군/구 이름이 학교명에 없으면 시도 내 전체 sgg 순회
+    all_codes: list = []
+    for codes in sgg_map.values():
+        for c in codes:
+            if c not in all_codes:
+                all_codes.append(c)
+    return all_codes
+
+
+def _get_city_from_neis(school_code: str, office: str) -> str:
+    """NEIS schoolInfo API로 학교 주소를 가져와 시/군/구 이름 추출"""
+    import requests as _req, urllib3 as _u3
+    _u3.disable_warnings(_u3.exceptions.InsecureRequestWarning)
+    try:
+        url = (
+            f"https://open.neis.go.kr/hub/schoolInfo"
+            f"?KEY={API_KEY}&Type=json&pIndex=1&pSize=1"
+            f"&ATPT_OFCDC_SC_CODE={office}&SD_SCHUL_CODE={school_code}"
+        )
+        r = _req.get(url, verify=False, timeout=8)
+        info = r.json()
+        rows = (info.get("schoolInfo", [{}])[1] or {}).get("row", [])
+        if rows:
+            addr = rows[0].get("ORG_RDNMA", "") or rows[0].get("ORG_TELNO", "")
+            # 주소 예: "경상북도 상주시 ..." → 첫 두 단어 중 시/군/구 추출
+            parts = addr.split()
+            for part in parts[1:3]:
+                city = part.replace("시", "").replace("군", "").replace("구", "")
+                if len(city) >= 2:
+                    return city
+    except Exception:
+        pass
+    return ""
 
 
 def _fetch_schoolinfo_meal(school_name: str, office: str,
-                            school_type: str, pban_yr: int) -> dict | None:
+                            school_type: str, pban_yr: int,
+                            school_code: str = "") -> dict | None:
     """학교알리미 급식 실시 현황 API 조회 (apiType=34)"""
     import requests as _req, urllib3 as _u3
     _u3.disable_warnings(_u3.exceptions.InsecureRequestWarning)
@@ -277,14 +317,34 @@ def _fetch_schoolinfo_meal(school_name: str, office: str,
     if not sido:
         return None
 
+    # 1단계: 학교명 키워드 매칭
     sgg_list = _get_sgg_candidates(school_name, sido)
+
+    # 2단계: 키워드 매칭 실패 시 NEIS 주소 API로 도시명 보완
+    if not sgg_list and school_code:
+        city_kw = _get_city_from_neis(school_code, office)
+        if city_kw:
+            sgg_map = _SGG_MAP.get(sido, {})
+            for kw, codes in sorted(sgg_map.items(), key=lambda x: -len(x[0])):
+                if kw in city_kw or city_kw in kw:
+                    sgg_list = codes
+                    break
+
+    # 3단계: 그래도 없으면 시도 내 전체 sgg 순회 (fallback)
+    if not sgg_list:
+        sgg_map = _SGG_MAP.get(sido, {})
+        seen: list = []
+        for codes in sgg_map.values():
+            for c in codes:
+                if c not in seen:
+                    seen.append(c)
+        sgg_list = seen
+
     if not sgg_list:
         return None
 
-    clean_target = (school_name
-                    .replace("초등학교", "").replace("중학교", "")
-                    .replace("고등학교", "").replace("특수학교", "")
-                    .strip())
+    # 비교용 정제된 학교명
+    clean_target = _clean_school_name(school_name)
 
     for sgg in sgg_list:
         url = (
@@ -298,9 +358,11 @@ def _fetch_schoolinfo_meal(school_name: str, office: str,
             if data.get("resultCode") == "success":
                 for item in data.get("list", []):
                     nm = item.get("SCHUL_NM", "")
-                    clean_nm = (nm.replace("초등학교", "").replace("중학교", "")
-                                .replace("고등학교", "").replace("특수학교", "").strip())
-                    if clean_nm == clean_target or school_name in nm or nm in school_name:
+                    clean_nm = _clean_school_name(nm)
+                    if (clean_nm == clean_target
+                            or school_name in nm
+                            or nm in school_name
+                            or clean_target in clean_nm):
                         return item
         except Exception:
             continue
@@ -642,10 +704,11 @@ with tab1:
                 )
 
             if _si_fetch_btn:
-                with st.spinner("학교알리미 데이터 조회 중..."):
+                with st.spinner(f"학교알리미 조회 중… ({school['name']})"):
                     _si_data = _fetch_schoolinfo_meal(
                         school["name"], school["office"],
                         school.get("type", "초등학교"), _si_sel_yr,
+                        school_code=school.get("code", ""),
                     )
                 if _si_data:
                     st.session_state["t1_si_data"] = _si_data
@@ -723,6 +786,7 @@ with tab1:
                             _td = _fetch_schoolinfo_meal(
                                 school["name"], school["office"],
                                 school.get("type", "초등학교"), _ty,
+                                school_code=school.get("code", ""),
                             )
                             if _td:
                                 _trend[str(_ty)] = {
