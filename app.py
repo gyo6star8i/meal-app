@@ -2127,10 +2127,10 @@ with tab6:
             f"<div style='text-align:center;padding:14px 8px;border-radius:12px;"
             f"background:{bar_color}12;border:2px solid {bar_color};'>"
             f"<div style='font-size:22px;'>{icon}</div>"
-            f"<div style='font-size:12px;color:#555;font-weight:bold;'>{label}</div>"
+            f"<div style='font-size:12px;font-weight:bold;'>{label}</div>"
             f"<div style='font-size:26px;font-weight:bold;color:{bar_color};'>"
             f"{my_val:.1f}<span style='font-size:13px;'>{unit}</span></div>"
-            f"<div style='font-size:12px;color:#888;'>전국 {nat_val}{unit}</div>"
+            f"<div style='font-size:12px;opacity:0.65;'>전국 {nat_val}{unit}</div>"
             f"<div style='font-size:13px;font-weight:bold;color:{bar_color};'>"
             f"{'▲' if diff>=0 else '▼'} {diff_label}{unit}</div>"
             f"</div>"
@@ -2161,7 +2161,7 @@ with tab6:
         _bmi6_lbl, _bmi6_clr = "비만", "#E53935"
 
     st.markdown(
-        f"<div style='background:#F8F9FA;border-radius:10px;padding:10px 16px;"
+        f"<div style='background:rgba(128,128,128,0.12);border-radius:10px;padding:10px 16px;"
         f"margin-top:8px;font-size:14px;'>"
         f"📋 <b>종합:</b> BMI {_my_bmi6} "
         f"<b style='color:{_bmi6_clr};'>({_bmi6_lbl})</b> · "
@@ -2245,7 +2245,7 @@ with tab6:
                 f"<div style='font-weight:bold;color:{ac};font-size:15px;'>"
                 f"{info['icon']} {area} ({info['label']}) — 전국 평균 대비 "
                 f"{_ns_ref[area]['2023'] - (float(_my_j) if area=='제자리멀리뛰기' else float(_my_su)):.1f} 부족</div>"
-                f"<div style='font-size:13px;color:#555;margin-top:5px;'>{info['tip']}</div>"
+                f"<div style='font-size:13px;opacity:0.8;margin-top:5px;'>{info['tip']}</div>"
                 f"<div style='margin-top:8px;'>"
                 + "".join(
                     f"<span style='background:{ac}22;color:{ac};border:1px solid {ac}44;"
@@ -2253,7 +2253,7 @@ with tab6:
                     f"display:inline-block;'>🔹 {n}</span>"
                     for n in info["nutrients"]
                 )
-                + f"</div><div style='font-size:12px;color:#666;margin-top:6px;'>"
+                + f"</div><div style='font-size:12px;opacity:0.75;margin-top:6px;'>"
                 f"🛒 보충 식품: <b>{', '.join(info['foods'])}</b></div></div>",
                 unsafe_allow_html=True,
             )
@@ -2318,7 +2318,7 @@ with tab6:
             _score_color = {"상": "#43A047", "중": "#FB8C00", "하": "#EF5350"}.get(
                 _nr.get("meal_fitness_score", "중"), "#888")
             st.markdown(
-                f"<div style='background:#F8F9FA;border-radius:10px;padding:14px 18px;margin:8px 0;'>"
+                f"<div style='background:rgba(128,128,128,0.12);border-radius:10px;padding:14px 18px;margin:8px 0;'>"
                 f"<b style='font-size:15px;'>📋 종합 평가</b>"
                 f"<span style='float:right;background:{_score_color}22;color:{_score_color};"
                 f"border:1px solid {_score_color};border-radius:20px;padding:2px 12px;"
