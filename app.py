@@ -385,11 +385,12 @@ st.set_page_config(
 st.markdown("""
 <style>
     .meal-card {
-        background: white;
+        background: var(--secondary-background-color);
         border-radius: 12px;
         padding: 16px 20px;
         margin: 8px 0;
         box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        color: var(--text-color);
     }
     .meal-title {
         font-size: 18px;
@@ -399,7 +400,7 @@ st.markdown("""
     .meal-menu {
         font-size: 15px;
         line-height: 1.9;
-        color: #2C3A2E;
+        color: inherit;
         white-space: pre-line;
     }
     .kcal-badge {
