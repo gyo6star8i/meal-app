@@ -950,6 +950,13 @@ def _get_groq_key() -> str:
 # TAB 2: 주간 급식
 # ══════════════════════════════════════════════════════════
 with tab2:
+    # cur_date가 변경됐을 때만 해당 주간으로 동기화
+    # (Tab2 내 이전/다음 주 버튼으로 이동 중에는 덮어쓰지 않음)
+    _cur = st.session_state.cur_date
+    if st.session_state.get("t2_last_cur_date") != _cur:
+        st.session_state.week_monday = _cur - timedelta(days=_cur.weekday())
+        st.session_state["t2_last_cur_date"] = _cur
+
     monday = st.session_state.week_monday
     friday = monday + timedelta(days=4)
 
