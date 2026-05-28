@@ -789,24 +789,40 @@ with tab1:
                                 school_code=school.get("code", ""),
                             )
                             if _td:
-                                _trend[str(_ty)] = {
-                                    "급식학생수": _td.get("MLSV_STDNT_FGR", 0),
-                                    "전체학생수": _td.get("HAKSAENGSU_TOT", 0),
-                                    "급식률(%)":  float(_td.get("KS_RATE", 0)),
-                                }
+                                try:
+                                    _trend[str(_ty)] = {
+                                        "급식학생수": int(_td.get("MLSV_STDNT_FGR") or 0),
+                                        "전체학생수": int(_td.get("HAKSAENGSU_TOT") or 0),
+                                        "급식률(%)":  float(_td.get("KS_RATE") or 0),
+                                    }
+                                except (TypeError, ValueError):
+                                    pass
                     if _trend:
                         st.session_state["t1_si_trend"] = _trend
 
                 if "t1_si_trend" in st.session_state:
                     _tr = st.session_state["t1_si_trend"]
                     import pandas as _pd2
-                    _df_trend = _pd2.DataFrame(_tr).T
-                    st.markdown("##### 📊 연도별 급식 현황 변화")
-                    st.bar_chart(_df_trend[["급식학생수", "전체학생수"]])
-                    st.dataframe(
-                        _df_trend.style.format({"급식률(%)": "{:.1f}%"}),
-                        use_container_width=True,
-                    )
+                    try:
+                        # 안전한 DataFrame 생성 (None/빈값 처리 포함)
+                        _rows = [
+                            {
+                                "연도": str(_yr),
+                                "급식학생수": int(_v.get("급식학생수") or 0),
+                                "전체학생수": int(_v.get("전체학생수") or 0),
+                                "급식률(%)":  float(_v.get("급식률(%)") or 0),
+                            }
+                            for _yr, _v in sorted(_tr.items())
+                        ]
+                        _df_trend = _pd2.DataFrame(_rows).set_index("연도")
+                        st.markdown("##### 📊 연도별 급식 현황 변화")
+                        st.bar_chart(_df_trend[["급식학생수", "전체학생수"]])
+                        st.dataframe(
+                            _df_trend.style.format({"급식률(%)": "{:.1f}%"}),
+                            use_container_width=True,
+                        )
+                    except Exception as _e:
+                        st.warning(f"트렌드 차트 생성 실패: {_e}")
 
 # ══════════════════════════════════════════════════════════
 # TAB 2: 주간 급식
