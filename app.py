@@ -2331,7 +2331,7 @@ with tab6:
 
             # 급식 피드백
             st.markdown(
-                f"<div style='background:#E3F2FD;border-left:4px solid #1E88E5;"
+                f"<div style='background:rgba(30,136,229,0.12);border-left:4px solid #1E88E5;"
                 f"border-radius:8px;padding:12px 16px;margin:8px 0;'>"
                 f"<b style='color:#1E88E5;'>🍽️ 오늘 급식 체력 피드백</b><br>"
                 f"<span style='font-size:14px;'>{_nr.get('meal_feedback','')}</span></div>",
