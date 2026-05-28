@@ -894,6 +894,47 @@ def _analyze_meal_with_ai(menu: str, school_type: str, api_key: str) -> dict:
         return {"error": str(e)}
 
 
+def _weekly_shopping_with_ai(week_meals: dict, school_type: str, api_key: str) -> dict:
+    """주간 급식을 분석해 요일별 장보기 목록 반환.
+    반환 형태: {"월": [{"item": "연어", "reason": "오메가-3 보충"}, ...], "화": [...], ...}
+    """
+    meals_text = "\n".join(
+        f"{['월','화','수','목','금'][i]}요일({ymd[4:6]}/{ymd[6:8]}): {v.get('menu','급식없음')}"
+        for i, (ymd, v) in enumerate(sorted(week_meals.items())[:5])
+        if v.get("menu")
+    )
+    if not meals_text:
+        return {}
+
+    days = [d for ymd, v in sorted(week_meals.items())[:5]
+            for d in [['월','화','수','목','금'][sorted(week_meals.keys()).index(ymd)]]
+            if v.get("menu")]
+
+    prompt = f"""이번 주 {school_type} 급식 메뉴입니다:
+{meals_text}
+
+각 요일별로 학교 급식에서 부족할 수 있는 영양소를 가정에서 보충할 수 있는 장보기 재료를 추천해주세요.
+아래 JSON 형식으로만 응답해주세요 (설명 없이 JSON만):
+{{
+  "월": [{{"item": "재료명", "reason": "간단한 이유(10자 이내)", "emoji": "이모지"}}],
+  "화": [{{"item": "재료명", "reason": "간단한 이유(10자 이내)", "emoji": "이모지"}}],
+  "수": [{{"item": "재료명", "reason": "간단한 이유(10자 이내)", "emoji": "이모지"}}],
+  "목": [{{"item": "재료명", "reason": "간단한 이유(10자 이내)", "emoji": "이모지"}}],
+  "금": [{{"item": "재료명", "reason": "간단한 이유(10자 이내)", "emoji": "이모지"}}]
+}}
+급식 없는 날은 빈 배열로 두세요. 각 요일마다 3~4가지 재료를 추천해주세요."""
+
+    try:
+        raw = _call_groq(api_key, prompt, max_tokens=1024)
+        if "```json" in raw:
+            raw = raw.split("```json")[1].split("```")[0].strip()
+        elif "```" in raw:
+            raw = raw.split("```")[1].split("```")[0].strip()
+        return json.loads(raw)
+    except Exception:
+        return {}
+
+
 def _get_groq_key() -> str:
     """Streamlit secrets 또는 session_state 에서 Groq API 키 반환"""
     try:
@@ -1021,6 +1062,60 @@ with tab2:
                     f"</div>",
                     unsafe_allow_html=True,
                 )
+
+                # ── 주간 장보기 목록 ─────────────────────────────
+                _shop_cache_key = f"t2_shop_{monday.strftime('%Y%m%d')}"
+                if _shop_cache_key not in st.session_state:
+                    with st.spinner("🛒 주간 장보기 목록 생성 중..."):
+                        _shop_data = _weekly_shopping_with_ai(
+                            week_data, school.get("type", "초등학교"), _groq_key
+                        )
+                        st.session_state[_shop_cache_key] = _shop_data
+
+                _shop = st.session_state.get(_shop_cache_key, {})
+                if _shop:
+                    st.markdown("---")
+                    st.markdown(
+                        f"<div style='font-size:18px;font-weight:bold;color:{clr};"
+                        f"margin-bottom:12px;'>🛒 주간 장보기 목록</div>"
+                        f"<div style='font-size:13px;color:#888;margin-bottom:14px;'>"
+                        f"이번 주 급식의 부족 영양소를 보완하는 가정 장보기 추천 · "
+                        f"요일별로 나눠 몰아서 장보세요</div>",
+                        unsafe_allow_html=True,
+                    )
+
+                    _days_order = ["월", "화", "수", "목", "금"]
+                    _day_cols = st.columns(5)
+                    for _ci, _day in enumerate(_days_order):
+                        _items = _shop.get(_day, [])
+                        _d_date = monday + timedelta(days=_ci)
+                        with _day_cols[_ci]:
+                            st.markdown(
+                                f"<div style='background:{clr}18;border-radius:10px;"
+                                f"padding:10px 8px;min-height:160px;'>"
+                                f"<div style='font-weight:bold;font-size:15px;"
+                                f"color:{clr};text-align:center;margin-bottom:6px;'>"
+                                f"{_day}요일<br>"
+                                f"<span style='font-size:11px;font-weight:normal;"
+                                f"color:#888;'>{_d_date.month}/{_d_date.day}</span></div>"
+                                + (
+                                    "".join(
+                                        f"<div style='font-size:13px;padding:4px 2px;"
+                                        f"border-bottom:1px solid {clr}22;'>"
+                                        f"{it.get('emoji','🛒')} <b>{it.get('item','')}</b>"
+                                        f"<div style='font-size:11px;color:#777;"
+                                        f"margin-left:18px;'>{it.get('reason','')}</div>"
+                                        f"</div>"
+                                        for it in _items
+                                    ) if _items else
+                                    f"<div style='font-size:12px;color:#bbb;"
+                                    f"text-align:center;margin-top:20px;'>급식 없음</div>"
+                                )
+                                + "</div>",
+                                unsafe_allow_html=True,
+                            )
+
+                    st.caption("🤖 Groq AI 추천 · 참고용 정보입니다")
 
 # ══════════════════════════════════════════════════════════
 # TAB 3: 월별 칼로리 분석
