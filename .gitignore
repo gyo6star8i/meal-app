@@ -7,3 +7,12 @@ build/
 version_info.txt
 *.lnk
 .env
+.streamlit/secrets.toml
+streamlit.log
+*.log
+.claude/
+venv/
+.venv/
+*.pdf
+*.jpg
+*.png
