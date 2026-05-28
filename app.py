@@ -1414,22 +1414,6 @@ with tab4:
                 return res
         return {}
 
-    # ── UI ───────────────────────────────────────────────────
-    st.markdown(
-        f"<style>"
-        f"#t4-main-head{{background:{clr};border-radius:12px;padding:0;"
-        f"margin-bottom:16px;overflow:hidden;}}"
-        f"#t4-main-head h2{{color:white!important;text-align:center;margin:0;"
-        f"padding:16px 20px;font-size:24px;position:relative;}}"
-        f"#t4-main-head h2 a{{position:absolute;inset:0;display:block;"
-        f"font-size:0;line-height:0;color:transparent;}}"
-        f"</style>"
-        f"<div id='t4-main-head'>"
-        f"<h2>🥗 오늘의 급식 및 맞춤 식단 추천</h2>"
-        f"</div>",
-        unsafe_allow_html=True,
-    )
-
     # Streamlit secrets 우선 사용 (없으면 직접 입력한 키 사용)
     try:
         _secret_key = st.secrets.get("GROQ_API_KEY", "")
