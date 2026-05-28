@@ -1026,123 +1026,208 @@ with tab2:
 # TAB 3: 월별 칼로리 분석
 # ══════════════════════════════════════════════════════════
 with tab3:
-    st.markdown("### 📊 월별 칼로리 분석")
-    st.caption("해당 월의 전체 급식 칼로리를 분석하고 권장 칼로리와 비교합니다.")
+    import pandas as pd
 
-    col_y, col_m = st.columns(2)
-    with col_y:
-        sel_year = st.selectbox(
-            "연도",
-            list(range(_today.year - 2, _today.year + 1)),
-            index=2,
-            key="m_year",
-        )
-    with col_m:
-        sel_month = st.selectbox(
-            "월",
-            list(range(1, 13)),
-            index=_today.month - 1,
-            key="m_month",
-        )
+    # 공통 상수
+    _STATUS_COLOR = {"에너지 적절": "#43A047", "에너지 부족": "#2196F3",
+                     "에너지 과다": "#E53935", "데이터 없음": "#888888"}
+    _STATUS_ICON  = {"에너지 적절": "🟢", "에너지 부족": "🔵",
+                     "에너지 과다": "🔴", "데이터 없음": "⚪"}
 
-    if st.button("📊 분석 시작", type="primary", key="m_analyze"):
-        from_ymd = f"{sel_year}{sel_month:02d}01"
-        last_day = calendar.monthrange(sel_year, sel_month)[1]
-        to_ymd   = f"{sel_year}{sel_month:02d}{last_day:02d}"
+    st.markdown("### 📊 칼로리 분석")
 
-        with st.spinner(
-            f"⏳ {sel_year}년 {sel_month}월 데이터 불러오는 중...\n"
-            f"(API 키 없는 경우 날짜별 개별 조회로 시간이 걸릴 수 있습니다)"
-        ):
-            month_data, month_err = _fetch_all_pages(
-                from_ymd, to_ymd,
-                school["office"],
-                school["code"],
+    # ── 분석 모드 전환 ────────────────────────────────────────
+    _mode = st.radio(
+        "분석 단위", ["📅 월별 분석", "📋 주별 분석"],
+        horizontal=True, key="t3_mode", label_visibility="collapsed",
+    )
+
+    st.markdown("---")
+
+    # ════════════════════════════════════════════════════════
+    # 월별 분석
+    # ════════════════════════════════════════════════════════
+    if _mode == "📅 월별 분석":
+        st.caption("해당 월의 전체 급식 칼로리를 분석하고 권장 칼로리와 비교합니다.")
+
+        col_y, col_m = st.columns(2)
+        with col_y:
+            sel_year = st.selectbox(
+                "연도", list(range(_today.year - 2, _today.year + 1)),
+                index=2, key="m_year",
+            )
+        with col_m:
+            sel_month = st.selectbox(
+                "월", list(range(1, 13)),
+                index=_today.month - 1, key="m_month",
             )
 
-        if month_err:
-            st.error(f"오류: {month_err}")
-        elif not month_data:
-            st.info("해당 월의 급식 데이터가 없습니다.")
+        if st.button("📊 분석 시작", type="primary", key="m_analyze"):
+            from_ymd = f"{sel_year}{sel_month:02d}01"
+            last_day = calendar.monthrange(sel_year, sel_month)[1]
+            to_ymd   = f"{sel_year}{sel_month:02d}{last_day:02d}"
+
+            with st.spinner(f"⏳ {sel_year}년 {sel_month}월 데이터 불러오는 중..."):
+                month_data, month_err = _fetch_all_pages(
+                    from_ymd, to_ymd, school["office"], school["code"],
+                )
+
+            if month_err:
+                st.error(f"오류: {month_err}")
+            elif not month_data:
+                st.info("해당 월의 급식 데이터가 없습니다.")
+            else:
+                stype = school.get("type", "초등학교")
+                meal_days, avg, status, is_full = _analyze(month_data, stype)
+                rec = (RECOMMENDED_DAILY_KCAL.get(stype, 2300) if is_full
+                       else RECOMMENDED_LUNCH_KCAL.get(stype, 650))
+                s_color = _STATUS_COLOR.get(status, "#888")
+                s_icon  = _STATUS_ICON.get(status, "⚪")
+
+                st.markdown(f"#### {sel_year}년 {sel_month}월 분석 결과")
+                m1, m2, m3 = st.columns(3)
+                with m1: st.metric("📅 급식일수", f"{meal_days}일")
+                with m2: st.metric("🔥 평균 칼로리", f"{avg:.0f} kcal")
+                with m3: st.metric("🎯 권장 칼로리", f"{rec} kcal")
+
+                st.markdown(
+                    f"<div class='status-box' style='background:{s_color}15;"
+                    f"border:2px solid {s_color};font-size:22px;'>"
+                    f"{s_icon} {status}<br>"
+                    f"<span style='font-size:14px;font-weight:normal;color:#555;'>"
+                    f"{'하루 전체' if is_full else '점심'} 기준 · 권장 {rec} kcal"
+                    f"</span></div>",
+                    unsafe_allow_html=True,
+                )
+                if avg > 0 and rec > 0:
+                    st.progress(min(avg / rec / 1.5, 1.0))
+                    st.caption(f"권장량 대비 {avg/rec*100:.1f}%")
+
+                chart_rows = []
+                for ymd in sorted(month_data.keys()):
+                    meals = month_data[ymd]
+                    if not meals:
+                        continue
+                    day = int(ymd[6:8])
+                    v = sum(meals.values()) if is_full else (
+                        meals.get(2, 0) or next(iter(meals.values()), 0))
+                    if v > 0:
+                        chart_rows.append({"날짜": f"{day}일", "칼로리": v, "권장량": rec})
+
+                if chart_rows:
+                    df_m = pd.DataFrame(chart_rows).set_index("날짜")
+                    st.markdown("##### 📈 일별 칼로리")
+                    st.line_chart(df_m)
         else:
-            stype = school.get("type", "초등학교")
-            meal_days, avg, status, is_full = _analyze(month_data, stype)
+            st.info("위에서 연도와 월을 선택한 뒤 '분석 시작' 버튼을 클릭하세요.")
 
-            rec = (
-                RECOMMENDED_DAILY_KCAL.get(stype, 2300)
-                if is_full
-                else RECOMMENDED_LUNCH_KCAL.get(stype, 650)
-            )
+    # ════════════════════════════════════════════════════════
+    # 주별 분석
+    # ════════════════════════════════════════════════════════
+    else:
+        st.caption("해당 주의 요일별 급식 칼로리를 분석하고 권장 칼로리와 비교합니다.")
 
-            STATUS_COLOR = {
-                "에너지 적절": "#43A047",
-                "에너지 부족": "#2196F3",
-                "에너지 과다": "#E53935",
-                "데이터 없음": "#888888",
-            }
-            STATUS_ICON = {
-                "에너지 적절": "🟢",
-                "에너지 부족": "🔵",
-                "에너지 과다": "🔴",
-                "데이터 없음": "⚪",
-            }
-            s_color = STATUS_COLOR.get(status, "#888")
-            s_icon  = STATUS_ICON.get(status, "⚪")
+        # 주 선택 (Tab2와 같은 session_state 공유)
+        _w_mon = st.session_state.week_monday
+        _w_fri = _w_mon + timedelta(days=4)
 
-            st.markdown("---")
-            st.markdown(f"#### {sel_year}년 {sel_month}월 분석 결과")
-
-            # 요약 지표
-            m1, m2, m3 = st.columns(3)
-            with m1:
-                st.metric("📅 급식일수", f"{meal_days}일")
-            with m2:
-                st.metric("🔥 평균 칼로리", f"{avg:.0f} kcal")
-            with m3:
-                st.metric("🎯 권장 칼로리", f"{rec} kcal")
-
-            # 종합 판정
+        wa1, wa2, wa3 = st.columns([1.2, 4, 1.2])
+        with wa1:
+            if st.button("◀ 이전 주", key="t3_wprev", use_container_width=True):
+                st.session_state.week_monday -= timedelta(weeks=1)
+                st.rerun()
+        with wa2:
             st.markdown(
-                f"<div class='status-box' style='background:{s_color}15;"
-                f"border:2px solid {s_color};font-size:22px;'>"
-                f"{s_icon} {status}<br>"
-                f"<span style='font-size:14px;font-weight:normal;color:#555;'>"
-                f"{'하루 전체' if is_full else '점심'} 기준 · 권장 {rec} kcal</span></div>",
+                f"<h4 style='text-align:center;color:{clr};margin:4px 0;'>"
+                f"{_w_mon.strftime('%Y년 %m월 %d일')} ~ {_w_fri.strftime('%m월 %d일')}</h4>",
                 unsafe_allow_html=True,
             )
+        with wa3:
+            if st.button("다음 주 ▶", key="t3_wnext", use_container_width=True):
+                st.session_state.week_monday += timedelta(weeks=1)
+                st.rerun()
 
-            if avg > 0 and rec > 0:
-                ratio = avg / rec * 100
-                st.progress(min(ratio / 150, 1.0))
-                st.caption(f"권장량 대비 {ratio:.1f}%")
+        if st.button("이번 주로", key="t3_wtoday"):
+            st.session_state.week_monday = _today - timedelta(days=_today.weekday())
+            st.rerun()
 
-            # 일별 칼로리 차트
-            import pandas as pd
+        with st.spinner("주간 급식 데이터 불러오는 중..."):
+            _wk_data, _wk_err = fetch_week_meals(
+                st.session_state.week_monday, school["office"], school["code"],
+            )
 
-            chart_rows = []
-            for ymd in sorted(month_data.keys()):
-                meals = month_data[ymd]
-                if not meals:
-                    continue
-                day = int(ymd[6:8])
-                if is_full:
-                    v = sum(meals.values())
-                else:
-                    v = meals.get(2, 0)
-                    if v == 0:
-                        v = next(iter(meals.values()), 0)
-                if v > 0:
-                    chart_rows.append({"날짜": f"{day}일", "칼로리": v, "권장량": rec})
+        if _wk_err:
+            st.error(f"오류: {_wk_err}")
+        else:
+            stype = school.get("type", "초등학교")
+            rec_w = RECOMMENDED_LUNCH_KCAL.get(stype, 650)
+            days_kr = ["월", "화", "수", "목", "금"]
+            _rows_w = []
+            _day_results = []
 
-            if chart_rows:
-                df = pd.DataFrame(chart_rows).set_index("날짜")
-                st.markdown("##### 일별 칼로리")
-                st.line_chart(df)
+            for i in range(5):
+                d = st.session_state.week_monday + timedelta(days=i)
+                ymd = d.strftime("%Y%m%d")
+                meal = _wk_data.get(ymd, {})
+                kcal_raw = meal.get("kcal", "") if meal else ""
+                kcal_v   = _kcal_value(kcal_raw)
+                _rows_w.append({"요일": f"{days_kr[i]}({d.month}/{d.day})",
+                                 "칼로리": kcal_v, "권장량": rec_w})
+                if kcal_v > 0:
+                    st_label, st_icon, st_col = _judge(kcal_v, rec_w)
+                    _day_results.append((days_kr[i], kcal_v, st_label, st_icon, st_col))
+
+            # 요약 지표
+            valid_kcals = [r["칼로리"] for r in _rows_w if r["칼로리"] > 0]
+            if valid_kcals:
+                _avg_w = sum(valid_kcals) / len(valid_kcals)
+                _max_w = max(valid_kcals)
+                _min_w = min(valid_kcals)
+
+                st.markdown("---")
+                wc1, wc2, wc3, wc4 = st.columns(4)
+                with wc1: st.metric("📅 급식일수", f"{len(valid_kcals)}일")
+                with wc2: st.metric("🔥 주간 평균", f"{_avg_w:.0f} kcal")
+                with wc3: st.metric("⬆️ 최고", f"{_max_w:.0f} kcal")
+                with wc4: st.metric("⬇️ 최저", f"{_min_w:.0f} kcal")
+
+                # 종합 판정
+                _ov_st, _ov_ic, _ov_col = _judge(_avg_w, rec_w)
+                st.markdown(
+                    f"<div class='status-box' style='background:{_ov_col}15;"
+                    f"border:2px solid {_ov_col};font-size:20px;'>"
+                    f"{_ov_ic} 주간 평균 {_ov_st}<br>"
+                    f"<span style='font-size:13px;font-weight:normal;color:#555;'>"
+                    f"점심 기준 · 권장 {rec_w} kcal</span></div>",
+                    unsafe_allow_html=True,
+                )
+                st.progress(min(_avg_w / rec_w / 1.5, 1.0))
+                st.caption(f"권장량 대비 {_avg_w/rec_w*100:.1f}%")
+
+                # 요일별 막대 차트
+                st.markdown("##### 📊 요일별 칼로리")
+                df_w = pd.DataFrame(_rows_w).set_index("요일")
+                st.bar_chart(df_w)
+
+                # 요일별 상세 카드
+                st.markdown("##### 📋 요일별 상세")
+                _dcols = st.columns(len(_day_results))
+                for idx, (day_name, kcal, lbl, icon, col) in enumerate(_day_results):
+                    with _dcols[idx]:
+                        st.markdown(
+                            f"<div style='text-align:center;padding:10px 6px;"
+                            f"border-radius:10px;background:{col}15;"
+                            f"border:1.5px solid {col};'>"
+                            f"<div style='font-weight:bold;font-size:15px;'>{day_name}요일</div>"
+                            f"<div style='font-size:18px;font-weight:bold;color:{col};margin:4px 0;'>"
+                            f"{kcal:.0f}</div>"
+                            f"<div style='font-size:11px;color:#666;'>kcal</div>"
+                            f"<div style='font-size:13px;font-weight:bold;color:{col};'>"
+                            f"{icon} {lbl}</div></div>",
+                            unsafe_allow_html=True,
+                        )
             else:
-                st.info("차트를 그릴 데이터가 없습니다.")
-
-    else:
-        st.info("위에서 연도와 월을 선택한 뒤 '분석 시작' 버튼을 클릭하세요.")
+                st.info("해당 주에 칼로리 데이터가 없습니다.")
 
 # ══════════════════════════════════════════════════════════
 # TAB 4: 맞춤 식단 추천
