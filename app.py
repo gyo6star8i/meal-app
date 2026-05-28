@@ -673,12 +673,13 @@ with tab1:
                     bg   = MEAL_BG[mc]
                     mc_color = MEAL_CLR[mc]
                     kcal_e = re.sub(r'\(해당.*?\)', '', md.get("kcal", "")).strip()
+                    kcal_e_html = f'<div style="color:#888;font-size:13px;margin-top:6px;">🔥 열량: {kcal_e}</div>' if kcal_e else ''
                     st.markdown(
                         f"<div class='meal-card' style='background:{bg};"
                         f"border-left:4px solid {mc_color};'>"
                         f"<div class='meal-title' style='color:{mc_color};'>{icon} {name} 급식</div>"
                         f"<div class='meal-menu'>{md['menu']}</div>"
-                        f"{'<div style=\"color:#888;font-size:13px;margin-top:6px;\">🔥 열량: ' + kcal_e + '</div>' if kcal_e else ''}"
+                        f"{kcal_e_html}"
                         f"</div>",
                         unsafe_allow_html=True,
                     )
@@ -1621,10 +1622,11 @@ with tab4:
         st.markdown("#### 📌 오늘 점심 급식")
         if lunch_menu:
             kcal_clean = re.sub(r'\(해당.*?\)', '', lunch_kcal).strip()
+            kcal_clean_html = f'<div style="color:#888;font-size:13px;margin-top:6px;">🔥 {kcal_clean}</div>' if kcal_clean else ''
             st.markdown(
                 f"<div class='meal-card' style='border-left:4px solid {clr};'>"
                 f"<div class='meal-menu'>{lunch_menu}</div>"
-                f"{'<div style=\"color:#888;font-size:13px;margin-top:6px;\">🔥 ' + kcal_clean + '</div>' if kcal_clean else ''}"
+                f"{kcal_clean_html}"
                 f"</div>",
                 unsafe_allow_html=True,
             )
@@ -1957,13 +1959,14 @@ with tab5:
                     with _dc[_ci]:
                         _cc = _cat_clr.get(_cat, "#888")
                         _is_mine = _cat == _bmi_lbl
+                        _mine_html = '<div style="font-size:11px;color:#888;">← 내 위치</div>' if _is_mine else ''
                         st.markdown(
                             f"<div style='text-align:center;padding:10px 6px;border-radius:8px;"
                             f"background:{'#F0F7EE' if _is_mine else '#F8F9FA'};"
                             f"border:2px solid {_cc if _is_mine else '#eee'};'>"
                             f"<div style='font-size:13px;color:{_cc};font-weight:bold;'>{_cat}</div>"
                             f"<div style='font-size:22px;font-weight:bold;color:{_cc};'>{_pct_v}%</div>"
-                            f"{'<div style=\"font-size:11px;color:#888;\">← 내 위치</div>' if _is_mine else ''}"
+                            f"{_mine_html}"
                             f"</div>",
                             unsafe_allow_html=True,
                         )
