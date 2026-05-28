@@ -531,7 +531,7 @@ st.markdown(
 )
 
 # 탭 구성
-tab1, tab2, tab3, tab4 = st.tabs(["📅 오늘의 급식", "📋 주간 급식", "📊 칼로리 분석", "🥗 개인 맞춤 식단 분석"])
+tab1, tab2, tab3, tab4, tab5 = st.tabs(["📅 오늘의 급식", "📋 주간 급식", "📊 칼로리 분석", "🥗 개인 맞춤 식단 분석", "🏥 건강 기준 비교"])
 
 # ══════════════════════════════════════════════════════════
 # TAB 1: 오늘의 급식
@@ -1631,114 +1631,6 @@ with tab4:
         else:
             st.info("오늘 급식 데이터가 없습니다. 날짜를 확인해주세요.")
 
-        # ── 전국 학생 건강 기준 비교 ────────────────────────────────
-        _hs_data = _load_health_stats()
-        if _hs_data:
-            with st.expander("📊 전국 학생 건강 기준과 내 건강 비교", expanded=st.session_state.get("hc_expanded", True)):
-                st.caption("학생건강검사 표본통계 (교육부, 2023-2025 / 269,013명 기반)")
-                _hc1, _hc2, _hc3 = st.columns(3)
-                with _hc1:
-                    _school_sel = st.selectbox("학교급", ["초", "중", "고"], key="hc_school")
-                with _hc2:
-                    _grade_map_hc = {"초": ["1","2","3","4","5","6"], "중": ["1","2","3"], "고": ["1","2","3"]}
-                    _grade_sel = st.selectbox("학년", _grade_map_hc.get(_school_sel, ["1"]), key="hc_grade")
-                with _hc3:
-                    _gender_sel = st.selectbox("성별", ["남", "여"], key="hc_gender")
-
-                _hk1, _hk2 = st.columns(2)
-                with _hk1:
-                    _my_h = st.number_input("내 키 (cm)", min_value=100.0, max_value=220.0, value=st.session_state.get("hc_h", 160.0), step=0.1, key="hc_h")
-                with _hk2:
-                    _my_w = st.number_input("내 몸무게 (kg)", min_value=20.0, max_value=150.0, value=st.session_state.get("hc_w", 55.0), step=0.1, key="hc_w")
-
-                _my_bmi = round(_my_w / ((_my_h / 100) ** 2), 1)
-
-                _ns = _hs_data.get("stats", {}).get(_school_sel, {}).get(_grade_sel, {}).get(_gender_sel, {})
-                if _ns:
-                    _nat_h   = _ns.get("키", {}).get("평균", 0)
-                    _nat_w   = _ns.get("몸무게", {}).get("평균", 0)
-                    _nat_bmi = _ns.get("BMI", {}).get("평균", 0)
-                    _nat_bmi_pct = _ns.get("BMI", {}).get("백분위", {})
-                    _obesity = _ns.get("비만율", 0)
-                    _overweight = _ns.get("과체중이상율", 0)
-                    _breakfast_r = _ns.get("아침식사_섭취율", 0)
-                    _veg_r   = _ns.get("채소김치제외_자주섭취율", 0)
-                    _fruit_r = _ns.get("과일_자주섭취율", 0)
-                    _exercise_r = _ns.get("운동_실천율", 0)
-                    _ns_n    = _ns.get("n", 0)
-
-                    # BMI 등급 판정
-                    if _my_bmi < 18.5:
-                        _bmi_lbl, _bmi_clr = "저체중", "#5C6BC0"
-                    elif _my_bmi < 23:
-                        _bmi_lbl, _bmi_clr = "정상", "#43A047"
-                    elif _my_bmi < 25:
-                        _bmi_lbl, _bmi_clr = "과체중", "#FB8C00"
-                    else:
-                        _bmi_lbl, _bmi_clr = "비만", "#E53935"
-
-                    # 백분위 대략 계산 (전국 대비 상위/하위)
-                    _pct_vals = sorted([(int(k), float(v)) for k, v in _nat_bmi_pct.items()], key=lambda x: x[0])
-                    _bmi_rank_pct = 50
-                    for _pp, _pv in _pct_vals:
-                        if _my_bmi <= _pv:
-                            _bmi_rank_pct = _pp
-                            break
-                    else:
-                        _bmi_rank_pct = 99
-
-                    st.markdown("---")
-                    # 신체계측 비교
-                    _m1, _m2, _m3 = st.columns(3)
-                    with _m1:
-                        st.metric("내 BMI", f"{_my_bmi}",
-                                  f"{_my_bmi - _nat_bmi:+.1f} (전국 평균 {_nat_bmi})")
-                    with _m2:
-                        st.metric("키 (전국 평균)", f"{_my_h:.1f} cm",
-                                  f"{_my_h - _nat_h:+.1f} cm")
-                    with _m3:
-                        st.metric("몸무게 (전국 평균)", f"{_my_w:.1f} kg",
-                                  f"{_my_w - _nat_w:+.1f} kg")
-
-                    # BMI 상태 + 전국 비만율
-                    st.markdown(
-                        f"<div style='background:#F8F9FA;border-radius:10px;padding:12px 16px;margin:8px 0;'>"
-                        f"<span style='font-size:15px;'>내 BMI 상태: "
-                        f"<b style='color:{_bmi_clr};'>{_bmi_lbl} (BMI {_my_bmi})</b>"
-                        f" &nbsp;·&nbsp; 전국 {_school_sel}{_grade_sel}학년 {_gender_sel} 하위 약 "
-                        f"<b>{_bmi_rank_pct}%ile</b></span><br>"
-                        f"<span style='font-size:13px;color:#666;'>전국 비만율 {_obesity}% "
-                        f"/ 과체중 이상 {_overweight}% (표본 {_ns_n:,}명)</span>"
-                        f"</div>",
-                        unsafe_allow_html=True,
-                    )
-
-                    # 식습관 / 생활습관 비교
-                    st.markdown("**전국 같은 그룹 식습관 · 생활습관**")
-                    _h1, _h2, _h3, _h4 = st.columns(4)
-                    with _h1:
-                        st.metric("아침식사 섭취율", f"{_breakfast_r}%")
-                    with _h2:
-                        st.metric("채소 자주섭취율", f"{_veg_r}%")
-                    with _h3:
-                        st.metric("과일 자주섭취율", f"{_fruit_r}%")
-                    with _h4:
-                        st.metric("운동 실천율", f"{_exercise_r}%")
-
-                    # AI에 전달할 건강 컨텍스트 저장
-                    st.session_state["t4_health_ctx"] = (
-                        f"학생: {_school_sel}학교 {_grade_sel}학년 {_gender_sel} / "
-                        f"키 {_my_h}cm · 몸무게 {_my_w}kg · BMI {_my_bmi} ({_bmi_lbl})\n"
-                        f"전국 동일그룹 평균: 키 {_nat_h}cm · BMI {_nat_bmi} · 비만율 {_obesity}%\n"
-                        f"전국 식습관: 아침식사 {_breakfast_r}% / 채소자주섭취 {_veg_r}% / "
-                        f"과일자주섭취 {_fruit_r}% / 운동실천 {_exercise_r}%"
-                    )
-                    st.session_state["hc_expanded"] = False  # 첫 로드 이후 자동 접힘
-                else:
-                    st.info("해당 그룹의 통계 데이터가 없습니다.")
-        else:
-            st.session_state.pop("t4_health_ctx", None)
-
         # ── 식약처 영양성분 DB 조회 버튼 ──────────────────────────
         if lunch_menu:
             # HTML 태그 제거 후 메뉴 아이템 파싱
@@ -1959,3 +1851,150 @@ with tab4:
                         unsafe_allow_html=True,
                     )
 
+# ══════════════════════════════════════════════════════════
+# Tab 5 – 건강 기준 비교
+# ══════════════════════════════════════════════════════════
+with tab5:
+    st.markdown("#### 🏥 전국 학생 건강 기준과 내 건강 비교")
+    _hs_data = _load_health_stats()
+    if not _hs_data:
+        st.warning("health_stats.json 파일이 없습니다. preprocess_health.py 를 먼저 실행하세요.")
+    else:
+        st.caption("학생건강검사 표본통계 (교육부, 2023-2025 / 269,013명 기반)")
+
+        # ── 프로필 입력 ──────────────────────────────────────
+        st.markdown("##### 내 정보 입력")
+        _hc1, _hc2, _hc3 = st.columns(3)
+        with _hc1:
+            _school_sel = st.selectbox("학교급", ["초", "중", "고"], key="hc_school")
+        with _hc2:
+            _grade_map_hc = {"초": ["1","2","3","4","5","6"], "중": ["1","2","3"], "고": ["1","2","3"]}
+            _grade_sel = st.selectbox("학년", _grade_map_hc.get(_school_sel, ["1"]), key="hc_grade")
+        with _hc3:
+            _gender_sel = st.selectbox("성별", ["남", "여"], key="hc_gender")
+
+        _hk1, _hk2 = st.columns(2)
+        with _hk1:
+            _my_h = st.number_input("내 키 (cm)", min_value=100.0, max_value=220.0, value=160.0, step=0.1, key="hc_h")
+        with _hk2:
+            _my_w = st.number_input("내 몸무게 (kg)", min_value=20.0, max_value=150.0, value=55.0, step=0.1, key="hc_w")
+
+        _my_bmi = round(_my_w / ((_my_h / 100) ** 2), 1)
+
+        # ── 전국 통계 조회 ────────────────────────────────────
+        _ns = _hs_data.get("stats", {}).get(_school_sel, {}).get(_grade_sel, {}).get(_gender_sel, {})
+        if not _ns:
+            st.info("해당 그룹의 통계 데이터가 없습니다.")
+        else:
+            _nat_h       = _ns.get("키", {}).get("평균", 0)
+            _nat_w       = _ns.get("몸무게", {}).get("평균", 0)
+            _nat_bmi     = _ns.get("BMI", {}).get("평균", 0)
+            _nat_bmi_pct = _ns.get("BMI", {}).get("백분위", {})
+            _obesity     = _ns.get("비만율", 0)
+            _overweight  = _ns.get("과체중이상율", 0)
+            _breakfast_r = _ns.get("아침식사_섭취율", 0)
+            _veg_r       = _ns.get("채소김치제외_자주섭취율", 0)
+            _fruit_r     = _ns.get("과일_자주섭취율", 0)
+            _exercise_r  = _ns.get("운동_실천율", 0)
+            _sleep_r     = _ns.get("수면_충분율", 0)
+            _ns_n        = _ns.get("n", 0)
+
+            # BMI 등급 판정
+            if _my_bmi < 18.5:
+                _bmi_lbl, _bmi_clr = "저체중", "#5C6BC0"
+            elif _my_bmi < 23:
+                _bmi_lbl, _bmi_clr = "정상", "#43A047"
+            elif _my_bmi < 25:
+                _bmi_lbl, _bmi_clr = "과체중", "#FB8C00"
+            else:
+                _bmi_lbl, _bmi_clr = "비만", "#E53935"
+
+            # BMI 백분위 계산
+            _pct_vals = sorted([(int(k), float(v)) for k, v in _nat_bmi_pct.items()], key=lambda x: x[0])
+            _bmi_rank_pct = 50
+            for _pp, _pv in _pct_vals:
+                if _my_bmi <= _pv:
+                    _bmi_rank_pct = _pp
+                    break
+            else:
+                _bmi_rank_pct = 99
+
+            st.markdown("---")
+
+            # ── 신체계측 비교 ──────────────────────────────────
+            st.markdown("##### 신체계측 전국 비교")
+            _m1, _m2, _m3 = st.columns(3)
+            with _m1:
+                st.metric("내 BMI", f"{_my_bmi}",
+                          f"{_my_bmi - _nat_bmi:+.1f} (전국 평균 {_nat_bmi})")
+            with _m2:
+                st.metric("키 (전국 평균)", f"{_my_h:.1f} cm",
+                          f"{_my_h - _nat_h:+.1f} cm")
+            with _m3:
+                st.metric("몸무게 (전국 평균)", f"{_my_w:.1f} kg",
+                          f"{_my_w - _nat_w:+.1f} kg")
+
+            # BMI 상태 배너
+            st.markdown(
+                f"<div style='background:#F8F9FA;border-radius:10px;padding:14px 18px;margin:10px 0;'>"
+                f"<span style='font-size:16px;'>내 BMI 상태: "
+                f"<b style='color:{_bmi_clr};'>{_bmi_lbl} (BMI {_my_bmi})</b>"
+                f" &nbsp;·&nbsp; 전국 {_school_sel}{_grade_sel}학년 {_gender_sel} 하위 약 "
+                f"<b>{_bmi_rank_pct}%ile</b></span><br>"
+                f"<span style='font-size:13px;color:#666;'>전국 비만율 {_obesity}% "
+                f"/ 과체중 이상 {_overweight}% &nbsp;(표본 {_ns_n:,}명)</span>"
+                f"</div>",
+                unsafe_allow_html=True,
+            )
+
+            # ── 체질량지수 분포 ────────────────────────────────
+            _bmi_dist = _ns.get("체질량지수_분포", {})
+            if _bmi_dist:
+                st.markdown("##### 전국 체질량지수 분포")
+                _dc = st.columns(len(_bmi_dist))
+                _cat_clr = {"저체중": "#5C6BC0", "정상": "#43A047", "과체중": "#FB8C00", "비만": "#E53935"}
+                for _ci, (_cat, _pct_v) in enumerate(sorted(_bmi_dist.items(), key=lambda x: ["저체중","정상","과체중","비만"].index(x[0]) if x[0] in ["저체중","정상","과체중","비만"] else 9)):
+                    with _dc[_ci]:
+                        _cc = _cat_clr.get(_cat, "#888")
+                        _is_mine = _cat == _bmi_lbl
+                        st.markdown(
+                            f"<div style='text-align:center;padding:10px 6px;border-radius:8px;"
+                            f"background:{'#F0F7EE' if _is_mine else '#F8F9FA'};"
+                            f"border:2px solid {_cc if _is_mine else '#eee'};'>"
+                            f"<div style='font-size:13px;color:{_cc};font-weight:bold;'>{_cat}</div>"
+                            f"<div style='font-size:22px;font-weight:bold;color:{_cc};'>{_pct_v}%</div>"
+                            f"{'<div style=\"font-size:11px;color:#888;\">← 내 위치</div>' if _is_mine else ''}"
+                            f"</div>",
+                            unsafe_allow_html=True,
+                        )
+
+            st.markdown("---")
+
+            # ── 식습관 · 생활습관 비교 ─────────────────────────
+            st.markdown("##### 전국 같은 그룹 식습관 · 생활습관")
+            _h1, _h2, _h3, _h4, _h5 = st.columns(5)
+            with _h1:
+                st.metric("아침식사 섭취율", f"{_breakfast_r}%")
+            with _h2:
+                st.metric("채소 자주섭취율", f"{_veg_r}%")
+            with _h3:
+                st.metric("과일 자주섭취율", f"{_fruit_r}%")
+            with _h4:
+                st.metric("운동 실천율", f"{_exercise_r}%")
+            with _h5:
+                st.metric("수면 충분율", f"{_sleep_r}%")
+
+            # ── AI 식단 분석 연동 안내 ─────────────────────────
+            st.markdown("---")
+            # 건강 컨텍스트 session_state에 저장 (Tab4 AI 분석에서 활용)
+            st.session_state["t4_health_ctx"] = (
+                f"학생: {_school_sel}학교 {_grade_sel}학년 {_gender_sel} / "
+                f"키 {_my_h}cm · 몸무게 {_my_w}kg · BMI {_my_bmi} ({_bmi_lbl})\n"
+                f"전국 동일그룹 평균: 키 {_nat_h}cm · BMI {_nat_bmi} · 비만율 {_obesity}%\n"
+                f"전국 식습관: 아침식사 {_breakfast_r}% / 채소자주섭취 {_veg_r}% / "
+                f"과일자주섭취 {_fruit_r}% / 운동실천 {_exercise_r}%"
+            )
+            st.info(
+                f"💡 이 건강 정보는 **개인 맞춤 식단 분석** 탭의 AI 분석에 자동으로 반영됩니다. "
+                f"(현재 설정: {_school_sel}{_grade_sel}학년 {_gender_sel} / BMI {_my_bmi} {_bmi_lbl})"
+            )
