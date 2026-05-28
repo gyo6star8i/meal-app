@@ -1548,6 +1548,11 @@ with tab4:
         lunch_menu = t4_data.get(2, {}).get("menu", "") if t4_data else ""
         lunch_kcal = t4_data.get(2, {}).get("kcal", "") if t4_data else ""
 
+        # ── 캐시 키: 날짜 + 학교코드 기반 ────────────────────
+        _t4_fp = f"{st.session_state.cur_date.strftime('%Y%m%d')}_{school['code']}"
+        _t4_nutri_key  = f"t4_nutri_{_t4_fp}"
+        _t4_result_key = f"t4_result_{_t4_fp}"
+
         # 오늘 점심 카드
         st.markdown("#### 📌 오늘 점심 급식")
         if lunch_menu:
@@ -1591,7 +1596,7 @@ with tab4:
                         _nutri[_item] = _info
                     _time.sleep(0.25)   # 레이트 리밋 방지
                 prog.empty()
-                st.session_state["t4_nutri"] = _nutri
+                st.session_state[_t4_nutri_key] = _nutri
                 if not _nutri:
                     st.session_state["t4_nutri_empty"] = True
 
@@ -1599,8 +1604,8 @@ with tab4:
             st.warning("영양성분 DB에서 오늘 메뉴 항목을 찾지 못했습니다. (식품명 불일치 또는 네트워크 오류)")
             st.session_state.pop("t4_nutri_empty", None)
 
-        if "t4_nutri" in st.session_state and st.session_state["t4_nutri"]:
-            _nutri_data = st.session_state["t4_nutri"]
+        if st.session_state.get(_t4_nutri_key):
+            _nutri_data = st.session_state[_t4_nutri_key]
             with st.expander(
                 f"🔬 식약처 영양성분 DB 분석 — {len(_nutri_data)}개 메뉴 조회됨",
                 expanded=True,
@@ -1675,14 +1680,14 @@ with tab4:
 
         # ── AI 보완 식단 분석 결과 ────────────────────────────
         if run_analysis and lunch_menu:
-            with st.spinner("🤖 Claude AI가 급식을 분석하는 중..."):
+            with st.spinner("🤖 AI가 급식을 분석하는 중..."):
                 result = _analyze_meal_with_ai(
                     lunch_menu, school.get("type", "초등학교"), final_api_key
                 )
-            st.session_state["t4_result"] = result
+            st.session_state[_t4_result_key] = result
 
-        if "t4_result" in st.session_state:
-            result = st.session_state["t4_result"]
+        if st.session_state.get(_t4_result_key):
+            result = st.session_state[_t4_result_key]
 
             if "error" in result:
                 st.error(f"분석 오류: {result['error']}")
