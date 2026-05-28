@@ -1660,45 +1660,43 @@ with tab4:
                     "📊 출처: 식품의약품안전처 통합식품영양성분 DB (data.go.kr) · "
                     "1인 1회 제공량 기준"
                 )
-                for _food, _info in _nutri_data.items():
-                    _kcal  = _info.get("enerc", "")
-                    _prot  = _info.get("prot", "")
-                    _fat   = _info.get("fatce", "")
-                    _carb  = _info.get("chocdf", "")
-                    _fiber = _info.get("fibtg", "")
-                    _ca    = _info.get("ca", "")
-                    _na    = _info.get("nat", "")
-                    _vitc  = _info.get("vitc", "")
-                    _db_nm = _info.get("foodNm", _food)
-
-                    st.markdown(
-                        f"<div style='background:#F8F9FA;border-radius:10px;"
-                        f"padding:10px 14px;margin:6px 0;border-left:3px solid #4CAF50;'>"
-                        f"<b style='font-size:15px;'>🍽️ {_food}</b>"
-                        f"<span style='color:#888;font-size:12px;margin-left:8px;'>DB명: {_db_nm}</span>"
-                        f"<div style='display:flex;flex-wrap:wrap;gap:8px;margin-top:6px;'>",
-                        unsafe_allow_html=True,
-                    )
-                    _badges = [
-                        ("🔥", "열량",   _kcal,  "kcal", "#FF5722"),
-                        ("💪", "단백질", _prot,  "g",    "#2196F3"),
-                        ("🌾", "탄수화물",_carb, "g",    "#FF9800"),
-                        ("🫙", "지방",   _fat,   "g",    "#9C27B0"),
-                        ("🌿", "식이섬유",_fiber,"g",    "#4CAF50"),
-                        ("🦴", "칼슘",   _ca,    "mg",   "#00BCD4"),
-                        ("🧂", "나트륨", _na,    "mg",   "#607D8B"),
-                        ("🍋", "비타민C",_vitc, "mg",   "#FFEB3B"),
+                def _nutri_card(food, info):
+                    """영양성분 카드 HTML 생성"""
+                    db_nm = info.get("foodNm", food)
+                    badges = [
+                        ("🔥", "열량",    info.get("enerc",""),  "kcal", "#FF5722"),
+                        ("💪", "단백질",  info.get("prot",""),   "g",    "#2196F3"),
+                        ("🌾", "탄수화물",info.get("chocdf",""), "g",    "#FF9800"),
+                        ("🫙", "지방",    info.get("fatce",""),  "g",    "#9C27B0"),
+                        ("🌿", "식이섬유",info.get("fibtg",""),  "g",    "#4CAF50"),
+                        ("🦴", "칼슘",    info.get("ca",""),     "mg",   "#00BCD4"),
+                        ("🧂", "나트륨",  info.get("nat",""),    "mg",   "#607D8B"),
+                        ("🍋", "비타민C", info.get("vitc",""),   "mg",   "#FFEB3B"),
                     ]
-                    _badge_html = ""
-                    for _icon, _label, _val, _unit, _color in _badges:
-                        if _val:
-                            _badge_html += (
-                                f"<span style='background:{_color}18;color:{_color};"
-                                f"border:1px solid {_color}44;border-radius:20px;"
-                                f"padding:3px 9px;font-size:12px;white-space:nowrap;'>"
-                                f"{_icon} {_label} <b>{_val}{_unit}</b></span>"
-                            )
-                    st.markdown(_badge_html + "</div></div>", unsafe_allow_html=True)
+                    badge_html = "".join(
+                        f"<span style='background:{c}18;color:{c};border:1px solid {c}44;"
+                        f"border-radius:20px;padding:2px 8px;font-size:11px;white-space:nowrap;'>"
+                        f"{ic} {lb} <b>{v}{u}</b></span>"
+                        for ic, lb, v, u, c in badges if v
+                    )
+                    return (
+                        f"<div style='background:#F8F9FA;border-radius:10px;"
+                        f"padding:10px 12px;margin:4px 0;border-left:3px solid #4CAF50;'>"
+                        f"<b style='font-size:14px;'>🍽️ {food}</b>"
+                        f"<span style='color:#aaa;font-size:11px;margin-left:6px;'>({db_nm})</span>"
+                        f"<div style='display:flex;flex-wrap:wrap;gap:5px;margin-top:6px;'>"
+                        f"{badge_html}</div></div>"
+                    )
+
+                # 2열 그리드로 표시
+                _items_list = list(_nutri_data.items())
+                for _row in range(0, len(_items_list), 2):
+                    _gc1, _gc2 = st.columns(2)
+                    with _gc1:
+                        st.markdown(_nutri_card(*_items_list[_row]), unsafe_allow_html=True)
+                    with _gc2:
+                        if _row + 1 < len(_items_list):
+                            st.markdown(_nutri_card(*_items_list[_row + 1]), unsafe_allow_html=True)
 
                 # 합산 칼로리
                 _total_kcal = 0.0
