@@ -16,3 +16,11 @@ venv/
 *.pdf
 *.jpg
 *.png
+
+# 학생건강 원시자료 (대용량 - git 제외)
+학생건강자료/*.csv
+학생건강자료/*.xlsx
+학생건강자료/*.sav
+학생건강자료/*.zip
+# 전처리된 통계 JSON은 포함 (health_stats.json)
+!학생건강자료/health_stats.json
