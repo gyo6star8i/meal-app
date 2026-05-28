@@ -824,6 +824,55 @@ with tab1:
                     except Exception as _e:
                         st.warning(f"트렌드 차트 생성 실패: {_e}")
 
+# ──────────────────────────────────────────────────────────
+# Groq AI 유틸 (Tab2 자동 리포트 · Tab4 AI 분석 공용)
+# ──────────────────────────────────────────────────────────
+def _call_groq(api_key: str, prompt: str, max_tokens: int = 1024) -> str:
+    import requests as _rq, urllib3 as _u3
+    _u3.disable_warnings(_u3.exceptions.InsecureRequestWarning)
+    resp = _rq.post(
+        "https://api.groq.com/openai/v1/chat/completions",
+        headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+        json={"model": "llama-3.3-70b-versatile",
+              "messages": [{"role": "user", "content": prompt}],
+              "max_tokens": max_tokens},
+        verify=False, timeout=30,
+    )
+    resp.raise_for_status()
+    return resp.json()["choices"][0]["message"]["content"].strip()
+
+
+def _weekly_report_with_ai(week_meals: dict, school_type: str, api_key: str) -> str:
+    meals_text = "\n".join(
+        f"{ymd[4:6]}월 {ymd[6:8]}일: {v.get('menu','급식없음')}"
+        for ymd, v in sorted(week_meals.items()) if v.get("menu")
+    )
+    if not meals_text:
+        return "이번 주 급식 데이터가 없습니다."
+
+    prompt = f"""이번 주 {school_type} 급식 메뉴입니다:
+{meals_text}
+
+이번 주 급식의 영양 균형을 평가하고, 학부모에게 전달하는 간결한 주간 리포트를 3~4문장으로 작성해주세요.
+부족한 영양소와 가정에서 보완할 수 있는 방법을 포함해주세요."""
+
+    try:
+        return _call_groq(api_key, prompt, max_tokens=512)
+    except Exception as e:
+        return f"오류: {e}"
+
+
+def _get_groq_key() -> str:
+    """Streamlit secrets 또는 session_state 에서 Groq API 키 반환"""
+    try:
+        key = st.secrets.get("GROQ_API_KEY", "")
+        if key:
+            return key
+    except Exception:
+        pass
+    return st.session_state.get("t4_api_key_input", "")
+
+
 # ══════════════════════════════════════════════════════════
 # TAB 2: 주간 급식
 # ══════════════════════════════════════════════════════════
@@ -910,6 +959,36 @@ with tab2:
                         "<div class='no-meal'>급식 없음</div>",
                         unsafe_allow_html=True,
                     )
+
+        # ── 주간 AI 리포트 (자동 생성) ────────────────────────
+        _groq_key = _get_groq_key()
+        _report_cache_key = f"t2_report_{monday.strftime('%Y%m%d')}"
+
+        if _groq_key and not week_err:
+            _has_meals = any(v.get("menu") for v in week_data.values())
+            if _has_meals and _report_cache_key not in st.session_state:
+                with st.spinner("📋 AI 주간 리포트 생성 중..."):
+                    _rpt = _weekly_report_with_ai(
+                        week_data, school.get("type", "초등학교"), _groq_key
+                    )
+                    st.session_state[_report_cache_key] = _rpt
+
+            if _report_cache_key in st.session_state:
+                st.markdown("---")
+                _mon_lbl = monday.strftime("%m월 %d일")
+                _fri_lbl = (monday + timedelta(days=4)).strftime("%m월 %d일")
+                st.markdown(
+                    f"<div class='meal-card' style='border-left:4px solid {clr};'>"
+                    f"<div class='meal-title' style='color:{clr};'>"
+                    f"📋 AI 주간 급식 리포트 ({_mon_lbl} ~ {_fri_lbl})</div>"
+                    f"<div style='font-size:15px;line-height:1.8;color:#333;"
+                    f"white-space:pre-line;'>"
+                    f"{st.session_state[_report_cache_key]}</div>"
+                    f"<div style='margin-top:8px;font-size:12px;color:#aaa;'>"
+                    f"🤖 Groq AI (llama-3.3-70b) 분석 · 참고용 정보입니다</div>"
+                    f"</div>",
+                    unsafe_allow_html=True,
+                )
 
 # ══════════════════════════════════════════════════════════
 # TAB 3: 월별 칼로리 분석
@@ -1037,71 +1116,6 @@ with tab3:
 # TAB 4: 맞춤 식단 추천
 # ══════════════════════════════════════════════════════════
 with tab4:
-    # ── AI 분석 함수 ─────────────────────────────────────────
-    def _call_groq(api_key: str, prompt: str, max_tokens: int = 1024) -> str:
-        import requests, urllib3
-        urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-        resp = requests.post(
-            "https://api.groq.com/openai/v1/chat/completions",
-            headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
-            json={"model": "llama-3.3-70b-versatile",
-                  "messages": [{"role": "user", "content": prompt}],
-                  "max_tokens": max_tokens},
-            verify=False, timeout=30,
-        )
-        resp.raise_for_status()
-        return resp.json()["choices"][0]["message"]["content"].strip()
-
-    def _analyze_meal_with_ai(menu: str, school_type: str, api_key: str) -> dict:
-        prompt = f"""오늘 {school_type} 점심 급식 메뉴입니다:
-{menu}
-
-위 급식의 영양 구성을 분석하고, 아래 JSON 형식으로만 응답해주세요 (다른 텍스트 없이):
-{{
-  "nutrition_summary": "이 급식의 영양 구성 한 줄 요약",
-  "missing_nutrients": ["부족한 영양소1", "부족한 영양소2", "부족한 영양소3"],
-  "dinner": {{
-    "menu": "저녁 추천 메뉴 (예: 현미밥 + 닭가슴살 구이)",
-    "reason": "추천 이유 한 문장"
-  }},
-  "snack": {{
-    "menu": "간식 추천 (예: 방울토마토)",
-    "reason": "추천 이유 한 문장"
-  }},
-  "shopping_list": ["재료1", "재료2", "재료3", "재료4", "재료5"],
-  "weekly_tip": "이번 주 영양 균형을 위한 한 줄 조언"
-}}"""
-
-        try:
-            raw = _call_groq(api_key, prompt, max_tokens=1024)
-            if "```json" in raw:
-                raw = raw.split("```json")[1].split("```")[0].strip()
-            elif "```" in raw:
-                raw = raw.split("```")[1].split("```")[0].strip()
-            return json.loads(raw)
-        except Exception as e:
-            return {"error": str(e)}
-
-    # ── 주간 급식 요약 분석 함수 ──────────────────────────────
-    def _weekly_report_with_ai(week_meals: dict, school_type: str, api_key: str) -> str:
-        meals_text = "\n".join(
-            f"{ymd[4:6]}월 {ymd[6:8]}일: {v.get('menu','급식없음')}"
-            for ymd, v in sorted(week_meals.items()) if v.get("menu")
-        )
-        if not meals_text:
-            return "이번 주 급식 데이터가 없습니다."
-
-        prompt = f"""이번 주 {school_type} 급식 메뉴입니다:
-{meals_text}
-
-이번 주 급식의 영양 균형을 평가하고, 학부모에게 전달하는 간결한 주간 리포트를 3~4문장으로 작성해주세요.
-부족한 영양소와 가정에서 보완할 수 있는 방법을 포함해주세요."""
-
-        try:
-            return _call_groq(api_key, prompt, max_tokens=512)
-        except Exception as e:
-            return f"오류: {e}"
-
     # ── 식품의약품안전처 영양성분 DB 조회 ──────────────────────────
     def _fetch_nutrition_curl(food_name: str) -> dict:
         """식약처 통합식품영양성분 DB API 조회
@@ -1449,17 +1463,11 @@ with tab4:
         st.markdown("---")
 
         # AI 분석 버튼
-        col_btn1, col_btn2 = st.columns(2)
-        with col_btn1:
-            run_analysis = st.button(
-                "🤖 AI 보완 식단 분석", type="primary",
-                use_container_width=True, key="t4_run",
-                disabled=not lunch_menu,
-            )
-        with col_btn2:
-            run_weekly = st.button(
-                "📋 주간 리포트 생성", use_container_width=True, key="t4_weekly",
-            )
+        run_analysis = st.button(
+            "🤖 AI 보완 식단 분석", type="primary",
+            use_container_width=True, key="t4_run",
+            disabled=not lunch_menu,
+        )
 
         # ── AI 보완 식단 분석 결과 ────────────────────────────
         if run_analysis and lunch_menu:
@@ -1571,33 +1579,3 @@ with tab4:
                         unsafe_allow_html=True,
                     )
 
-        # ── 주간 리포트 ───────────────────────────────────────
-        if run_weekly:
-            with st.spinner("📋 이번 주 급식 분석 중..."):
-                w_data, w_err = fetch_week_meals(
-                    st.session_state.week_monday,
-                    school["office"],
-                    school["code"],
-                )
-                if w_err:
-                    st.error(f"주간 데이터 오류: {w_err}")
-                elif not any(v.get("menu") for v in w_data.values()):
-                    st.info("이번 주 급식 데이터가 없습니다.")
-                else:
-                    report_text = _weekly_report_with_ai(
-                        w_data, school.get("type", "초등학교"), final_api_key
-                    )
-                    st.session_state["t4_weekly_report"] = report_text
-
-        if "t4_weekly_report" in st.session_state:
-            st.markdown("---")
-            monday_label = st.session_state.week_monday.strftime("%m월 %d일")
-            friday_label = (st.session_state.week_monday + timedelta(days=4)).strftime("%m월 %d일")
-            st.markdown(
-                f"<div class='meal-card' style='border-left:4px solid {clr};'>"
-                f"<div class='meal-title' style='color:{clr};'>"
-                f"📅 주간 리포트 ({monday_label} ~ {friday_label})</div>"
-                f"<div style='font-size:15px;line-height:1.8;color:#333;white-space:pre-line;'>"
-                f"{st.session_state['t4_weekly_report']}</div></div>",
-                unsafe_allow_html=True,
-            )
