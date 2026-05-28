@@ -736,6 +736,26 @@ with tab4:
             "ca41a09537bd54e63daaa0dbbc32539394e7c0244d1aff5afb879d09240edeb8"
         )
 
+        def _extract_items(data: dict) -> list:
+            """한국 공공 OpenAPI 응답 형식 통합 파싱
+            - 형식A: {"response":{"body":{"items":[{...},{...}]}}}
+            - 형식B: {"response":{"body":{"items":{"item":[{...}]}}}}
+            - 형식C: {"response":{"body":{"items":{"item":{...}}}}}  ← 단일 결과
+            """
+            body = (data.get("response") or {}).get("body") or {}
+            raw = body.get("items")
+            if not raw:
+                return []
+            if isinstance(raw, list):          # 형식A
+                return raw
+            if isinstance(raw, dict):
+                inner = raw.get("item")
+                if isinstance(inner, list):    # 형식B
+                    return inner
+                if isinstance(inner, dict):    # 형식C (단일 결과)
+                    return [inner]
+            return []
+
         def _do_query(name: str) -> dict:
             if len(name) < 2:
                 return {}
@@ -749,12 +769,8 @@ with tab4:
                 import requests as _req, urllib3 as _u3
                 _u3.disable_warnings(_u3.exceptions.InsecureRequestWarning)
                 r = _req.get(url, verify=False, timeout=8)
-                data = r.json()
-                body = data.get("response", {}).get("body", {})
-                items = body.get("items") or []
-                if isinstance(items, dict):   # 결과 1건이면 dict로 오는 경우
-                    items = [items]
-                if isinstance(items, list) and items:
+                items = _extract_items(r.json())
+                if items:
                     return items[0]
             except Exception:
                 pass
@@ -764,12 +780,8 @@ with tab4:
                     ["curl", "-k", "-s", "--max-time", "8", url],
                     capture_output=True, text=True, timeout=12,
                 )
-                data = _json.loads(result.stdout)
-                body = data.get("response", {}).get("body", {})
-                items = body.get("items") or []
-                if isinstance(items, dict):
-                    items = [items]
-                if isinstance(items, list) and items:
+                items = _extract_items(_json.loads(result.stdout))
+                if items:
                     return items[0]
             except Exception:
                 pass
@@ -872,14 +884,16 @@ with tab4:
 
             if st.button("🔬 영양성분 DB 조회", key="t4_nutri_btn", use_container_width=True,
                          help="식품의약품안전처 통합식품영양성분 DB에서 각 메뉴의 영양소를 조회합니다"):
+                import time as _time
                 _nutri = {}
+                _total = min(len(_menu_items), 9)
                 prog = st.progress(0, text="식약처 영양성분 DB 조회 중...")
-                for _i, _item in enumerate(_menu_items[:8]):
-                    prog.progress((_i + 1) / min(len(_menu_items), 8),
-                                  text=f"조회 중: {_item}")
+                for _i, _item in enumerate(_menu_items[:9]):
+                    prog.progress((_i + 1) / _total, text=f"조회 중: {_item}")
                     _info = _fetch_nutrition_curl(_item)
                     if _info:
                         _nutri[_item] = _info
+                    _time.sleep(0.25)   # 레이트 리밋 방지
                 prog.empty()
                 st.session_state["t4_nutri"] = _nutri
                 if not _nutri:
