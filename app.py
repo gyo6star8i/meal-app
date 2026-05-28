@@ -720,14 +720,15 @@ with tab4:
     # ── 식품의약품안전처 영양성분 DB 조회 ──────────────────────────
     def _fetch_nutrition_curl(food_name: str) -> dict:
         """식약처 통합식품영양성분 DB API 조회
-        - requests(verify=False) 우선 시도 → Streamlit Cloud 등 일반 환경
+        - requests(verify=False) 우선 → Streamlit Cloud 등 일반 환경
         - 실패 시 curl subprocess 폴백 → 학교 SSL 프록시 환경
+        - 복합어 처리: 앞 수식어 2·4글자 제거 후 재검색 (근대된장국→된장국, 춘천닭갈비→닭갈비)
         """
         import subprocess, json as _json, urllib.parse, re as _re2
         # ① 식품명 정리: *, 숫자, 괄호 등 알레르기 마커 완전 제거
-        clean = _re2.sub(r"\(.*?\)", "", food_name)   # (1.2.5) 형태 제거
-        clean = _re2.sub(r"[\*\[\]\d\.\s]+$", "", clean).strip()  # 뒤쪽 * 및 숫자 제거
-        clean = _re2.sub(r"^\s*[\*\d]+\s*", "", clean).strip()   # 앞쪽 * 및 숫자 제거
+        clean = _re2.sub(r"\(.*?\)", "", food_name)
+        clean = _re2.sub(r"[\*\[\]\d\.\s]+$", "", clean).strip()
+        clean = _re2.sub(r"^\s*[\*\d]+\s*", "", clean).strip()
         if len(clean) < 2:
             return {}
 
@@ -736,10 +737,12 @@ with tab4:
         )
 
         def _do_query(name: str) -> dict:
+            if len(name) < 2:
+                return {}
             encoded = urllib.parse.quote(name)
             url = (
                 "https://api.data.go.kr/openapi/tn_pubr_public_nutri_food_info_api"
-                f"?serviceKey={NUTRI_API_KEY}&pageNo=1&numOfRows=3&type=json&foodNm={encoded}"
+                f"?serviceKey={NUTRI_API_KEY}&pageNo=1&numOfRows=5&type=json&foodNm={encoded}"
             )
             # 방법 1: requests verify=False (Streamlit Cloud / 일반 환경)
             try:
@@ -747,7 +750,10 @@ with tab4:
                 _u3.disable_warnings(_u3.exceptions.InsecureRequestWarning)
                 r = _req.get(url, verify=False, timeout=8)
                 data = r.json()
-                items = data.get("response", {}).get("body", {}).get("items", [])
+                body = data.get("response", {}).get("body", {})
+                items = body.get("items") or []
+                if isinstance(items, dict):   # 결과 1건이면 dict로 오는 경우
+                    items = [items]
                 if isinstance(items, list) and items:
                     return items[0]
             except Exception:
@@ -759,20 +765,30 @@ with tab4:
                     capture_output=True, text=True, timeout=12,
                 )
                 data = _json.loads(result.stdout)
-                items = data.get("response", {}).get("body", {}).get("items", [])
+                body = data.get("response", {}).get("body", {})
+                items = body.get("items") or []
+                if isinstance(items, dict):
+                    items = [items]
                 if isinstance(items, list) and items:
                     return items[0]
             except Exception:
                 pass
             return {}
 
-        # 전체 이름으로 먼저 시도
-        res = _do_query(clean)
-        if res:
-            return res
-        # 긴 복합어(6자 초과)는 앞 절반으로 재시도 (예: 망고블루베리요거트샐러드 → 망고블루베리)
+        # ② 다단계 검색: 전체→앞2글자제거→앞4글자제거→뒤3글자
+        # 예) 근대된장국→된장국→장국  /  춘천닭갈비→닭갈비→갈비
+        candidates = [clean]
+        if len(clean) > 4:
+            candidates.append(clean[2:])   # 앞 2글자 제거 (지역·재료 수식어 제거)
         if len(clean) > 6:
-            res = _do_query(clean[: len(clean) // 2 + 1])
+            candidates.append(clean[4:])   # 앞 4글자 제거
+        if len(clean) > 3:
+            candidates.append(clean[-3:])  # 뒤 3글자 (음식 종류 키워드)
+        if len(clean) > 2:
+            candidates.append(clean[-2:])  # 뒤 2글자 (최후 수단)
+
+        for candidate in candidates:
+            res = _do_query(candidate)
             if res:
                 return res
         return {}
