@@ -2003,183 +2003,249 @@ with tab5:
                 f"(현재 설정: {_school_sel}{_grade_sel}학년 {_gender_sel} / BMI {_my_bmi} {_bmi_lbl})"
             )
 
+
 # ══════════════════════════════════════════════════════════
-# TAB 6: PAPS 체력분석
+# TAB 6: PAPS 체력분석 (전국 평균 비교 + 급식 연계)
 # ══════════════════════════════════════════════════════════
+
+# ── 전국 학생 건강검사 통계 (한국교육개발원, 2019·2022·2023) ──
+_NS = {
+    "초": {
+        "남": {
+            "키":           {"2019": 145.3, "2022": 146.6, "2023": 150.5},
+            "몸무게":        {"2019": 43.1,  "2022": 45.6,  "2023": 48.4},
+            "제자리멀리뛰기": {"2019": 163.7, "2022": 151.6, "2023": 161.5},
+            "윗몸말아올리기": {"2019": 71.7,  "2022": 61.1,  "2023": 67.8},
+        },
+        "여": {
+            "키":           {"2019": 146.0, "2022": 146.9, "2023": 151.1},
+            "몸무게":        {"2019": 40.8,  "2022": 42.2,  "2023": 45.3},
+            "제자리멀리뛰기": {"2019": 144.5, "2022": 137.5, "2023": 144.4},
+            "윗몸말아올리기": {"2019": 54.3,  "2022": 50.0,  "2023": 52.7},
+        },
+    },
+    "중": {
+        "남": {
+            "키":           {"2019": 166.7, "2022": 166.3, "2023": 169.9},
+            "몸무게":        {"2019": 61.0,  "2022": 62.5,  "2023": 65.4},
+            "제자리멀리뛰기": {"2019": 200.2, "2022": 186.3, "2023": 197.6},
+            "윗몸말아올리기": {"2019": 82.9,  "2022": 76.8,  "2023": 79.0},
+        },
+        "여": {
+            "키":           {"2019": 159.1, "2022": 160.2, "2023": 160.4},
+            "몸무게":        {"2019": 53.3,  "2022": 54.5,  "2023": 54.8},
+            "제자리멀리뛰기": {"2019": 150.1, "2022": 147.5, "2023": 148.8},
+            "윗몸말아올리기": {"2019": 44.7,  "2022": 45.4,  "2023": 43.4},
+        },
+    },
+    "고": {
+        "남": {
+            "키":           {"2019": 173.4, "2022": 173.5, "2023": 174.3},
+            "몸무게":        {"2019": 70.2,  "2022": 70.3,  "2023": 72.1},
+            "제자리멀리뛰기": {"2019": 214.2, "2022": 208.1, "2023": 211.1},
+            "윗몸말아올리기": {"2019": 69.3,  "2022": 66.6,  "2023": 64.0},
+        },
+        "여": {
+            "키":           {"2019": 161.2, "2022": 161.4, "2023": 161.7},
+            "몸무게":        {"2019": 57.5,  "2022": 57.6,  "2023": 58.1},
+            "제자리멀리뛰기": {"2019": 151.2, "2022": 149.5, "2023": 149.3},
+            "윗몸말아올리기": {"2019": 35.1,  "2022": 34.0,  "2023": 33.2},
+        },
+    },
+}
+
 with tab6:
-    st.markdown("#### 💪 PAPS 학생건강체력평가 분석")
-    st.caption("PAPS(학생건강체력평가시스템) 결과와 급식 데이터를 연계한 맞춤 체력 향상 분석")
+    st.markdown("#### 💪 PAPS 체력 · 전국 평균 비교 및 급식 연계 분석")
+    st.caption("출처: 한국교육개발원 교육통계연보 · 11세(초)·14세(중)·17세(고) 기준")
 
-    # ── 기본 프로필 입력 ─────────────────────────────────
+    # ── 기본 정보 ──────────────────────────────────────────
     st.markdown("##### 기본 정보")
-    _pp1, _pp2, _pp3 = st.columns(3)
-    with _pp1:
-        _paps_school = st.selectbox("학교급", ["초", "중", "고"], key="paps_school")
-    with _pp2:
-        _paps_grade_map = {"초": ["3","4","5","6"], "중": ["1","2","3"], "고": ["1","2","3"]}
-        _paps_grade = st.selectbox("학년", _paps_grade_map[_paps_school], key="paps_grade")
-    with _pp3:
-        _paps_gender = st.selectbox("성별", ["남", "여"], key="paps_gender")
+    _n1, _n2 = st.columns(2)
+    with _n1:
+        _ns_school = st.selectbox("학교급", ["초", "중", "고"], key="ns_school",
+                                  help="초=11세, 중=14세, 고=17세 기준 통계")
+    with _n2:
+        _ns_gender = st.selectbox("성별", ["남", "여"], key="ns_gender")
 
     st.markdown("---")
 
-    # ── 5대 체력 영역 등급 입력 ───────────────────────────
-    st.markdown("##### PAPS 측정 결과 입력")
-    st.caption("학교에서 받은 PAPS 결과지의 등급을 입력하세요 (1등급=최상, 5등급=최하)")
+    # ── 신체 측정값 입력 ───────────────────────────────────
+    st.markdown("##### 📏 신체 측정값 입력")
+    _ns_ref = _NS[_ns_school][_ns_gender]
+    _nat_h  = _ns_ref["키"]["2023"]
+    _nat_w  = _ns_ref["몸무게"]["2023"]
+    _nat_j  = _ns_ref["제자리멀리뛰기"]["2023"]
+    _nat_su = _ns_ref["윗몸말아올리기"]["2023"]
 
-    PAPS_AREAS = {
-        "심폐지구력": {
-            "icon": "🫀", "color": "#E53935",
-            "desc": "왕복오래달리기 / 오래달리기-걷기",
-            "nutrients": ["철분", "비타민B12", "엽산", "복합탄수화물"],
-            "foods": ["시금치", "소고기", "현미밥", "고구마"],
-            "tip": "산소 운반 능력(철분)과 지속적 에너지원(복합탄수화물)이 심폐지구력 향상에 중요합니다.",
-        },
-        "유연성": {
-            "icon": "🤸", "color": "#8E24AA",
-            "desc": "앉아윗몸앞으로굽히기",
-            "nutrients": ["비타민C", "칼슘", "마그네슘", "오메가-3"],
-            "foods": ["키위", "파프리카", "우유", "견과류"],
-            "tip": "근육과 관절 건강을 위한 항산화 영양소와 미네랄이 유연성에 도움이 됩니다.",
-        },
-        "근력·근지구력": {
-            "icon": "💪", "color": "#1E88E5",
-            "desc": "악력 / 윗몸말아올리기",
-            "nutrients": ["단백질", "아연", "비타민D", "칼슘"],
-            "foods": ["닭가슴살", "두부", "달걀", "우유"],
-            "tip": "근육 합성을 위한 단백질과 뼈 건강을 위한 칼슘·비타민D가 근력 향상의 핵심입니다.",
-        },
-        "순발력": {
-            "icon": "⚡", "color": "#FB8C00",
-            "desc": "50m달리기 / 제자리멀리뛰기",
-            "nutrients": ["탄수화물", "단백질", "비타민B1", "인"],
-            "foods": ["바나나", "현미밥", "닭고기", "콩류"],
-            "tip": "빠른 에너지 공급(탄수화물)과 근육 회복(단백질)이 순발력 향상에 필요합니다.",
-        },
-        "비만(BMI)": {
-            "icon": "⚖️", "color": "#43A047",
-            "desc": "체질량지수 기반 비만도",
-            "nutrients": ["식이섬유", "단백질", "비타민", "미네랄"],
-            "foods": ["채소류", "콩류", "살코기", "통곡물"],
-            "tip": "포만감을 높이는 식이섬유와 근육 유지를 위한 단백질이 체중 관리의 핵심입니다.",
-        },
-    }
+    _mi1, _mi2, _mi3, _mi4 = st.columns(4)
+    with _mi1:
+        _my_h6 = st.number_input(
+            f"키 (cm)\n전국평균 {_nat_h}",
+            min_value=100.0, max_value=220.0,
+            value=float(st.session_state.get("hc_h", _nat_h)),
+            step=0.1, key="ns_h",
+        )
+    with _mi2:
+        _my_w6 = st.number_input(
+            f"몸무게 (kg)\n전국평균 {_nat_w}",
+            min_value=20.0, max_value=150.0,
+            value=float(st.session_state.get("hc_w", _nat_w)),
+            step=0.1, key="ns_w",
+        )
+    with _mi3:
+        _my_j = st.number_input(
+            f"제자리멀리뛰기 (cm)\n전국평균 {_nat_j}",
+            min_value=50.0, max_value=350.0,
+            value=float(_nat_j), step=1.0, key="ns_jump",
+        )
+    with _mi4:
+        _my_su = st.number_input(
+            f"윗몸말아올리기 (회/분)\n전국평균 {_nat_su}",
+            min_value=0.0, max_value=150.0,
+            value=float(_nat_su), step=1.0, key="ns_situp",
+        )
 
-    GRADE_COLORS = {1: "#1565C0", 2: "#43A047", 3: "#FB8C00", 4: "#EF5350", 5: "#B71C1C"}
-    GRADE_LABELS = {1: "매우 우수", 2: "우수", 3: "보통", 4: "부족", 5: "매우 부족"}
-
-    _paps_grades = {}
-    _area_keys = list(PAPS_AREAS.keys())
-    _input_cols = st.columns(5)
-    for i, area in enumerate(_area_keys):
-        info = PAPS_AREAS[area]
-        with _input_cols[i]:
-            st.markdown(
-                f"<div style='text-align:center;'>"
-                f"<div style='font-size:28px;'>{info['icon']}</div>"
-                f"<div style='font-size:12px;font-weight:bold;color:{info['color']};'>{area}</div>"
-                f"<div style='font-size:10px;color:#888;margin-bottom:4px;'>{info['desc']}</div>"
-                f"</div>",
-                unsafe_allow_html=True,
-            )
-            _paps_grades[area] = st.selectbox(
-                "등급", [1, 2, 3, 4, 5],
-                index=2,
-                key=f"paps_g_{i}",
-                label_visibility="collapsed",
-                format_func=lambda x: f"{x}등급 — {GRADE_LABELS[x]}",
-            )
-
-    # ── 종합 등급 계산 ────────────────────────────────────
-    _avg_g = sum(_paps_grades.values()) / len(_paps_grades)
-    _overall_g = round(_avg_g)
-    _ov_color = GRADE_COLORS.get(_overall_g, "#888")
-    _ov_label = GRADE_LABELS.get(_overall_g, "")
+    _my_bmi6 = round(_my_w6 / ((_my_h6 / 100) ** 2), 1)
+    _nat_bmi6 = round(_nat_w / ((_nat_h / 100) ** 2), 1)
 
     st.markdown("---")
-    st.markdown("##### 📊 체력 등급 현황")
 
-    # 등급 카드
-    _result_cols = st.columns(5)
-    for i, area in enumerate(_area_keys):
-        g = _paps_grades[area]
-        gc = GRADE_COLORS.get(g, "#888")
-        gl = GRADE_LABELS.get(g, "")
-        with _result_cols[i]:
-            st.markdown(
-                f"<div style='text-align:center;padding:12px 4px;border-radius:10px;"
-                f"background:{gc}15;border:2px solid {gc};'>"
-                f"<div style='font-size:11px;color:#555;font-weight:bold;'>{area}</div>"
-                f"<div style='font-size:30px;font-weight:bold;color:{gc};'>{g}</div>"
-                f"<div style='font-size:10px;color:{gc};'>{gl}</div>"
-                f"</div>",
-                unsafe_allow_html=True,
-            )
+    # ── ③ BMI + 체력 통합 비교 ────────────────────────────
+    st.markdown("##### 📊 전국 평균 통합 비교 (2023년 기준)")
 
-    # 종합 등급 배너
+    def _cmp_card(label, icon, my_val, nat_val, unit, higher_is_better=True):
+        diff = my_val - nat_val
+        pct  = (my_val / nat_val * 100) if nat_val else 0
+        if higher_is_better:
+            good = diff >= 0
+        else:
+            good = diff <= 0   # BMI: 낮을수록 좋음은 아니지만 여기선 ±표시만
+        bar_color  = "#43A047" if good else "#EF5350"
+        diff_label = f"+{diff:.1f}" if diff >= 0 else f"{diff:.1f}"
+        bar_val = min(pct / 150, 1.0)
+        return (
+            f"<div style='text-align:center;padding:14px 8px;border-radius:12px;"
+            f"background:{bar_color}12;border:2px solid {bar_color};'>"
+            f"<div style='font-size:22px;'>{icon}</div>"
+            f"<div style='font-size:12px;color:#555;font-weight:bold;'>{label}</div>"
+            f"<div style='font-size:26px;font-weight:bold;color:{bar_color};'>"
+            f"{my_val:.1f}<span style='font-size:13px;'>{unit}</span></div>"
+            f"<div style='font-size:12px;color:#888;'>전국 {nat_val}{unit}</div>"
+            f"<div style='font-size:13px;font-weight:bold;color:{bar_color};'>"
+            f"{'▲' if diff>=0 else '▼'} {diff_label}{unit}</div>"
+            f"</div>"
+        ), good
+
+    _c1, _c2, _c3, _c4 = st.columns(4)
+    _metrics = [
+        (_c1, "BMI",           "⚖️",  _my_bmi6,  _nat_bmi6, "",    False),
+        (_c2, "키",             "📏",  _my_h6,    _nat_h,    "cm",  True),
+        (_c3, "제자리멀리뛰기",  "🦘",  _my_j,     _nat_j,    "cm",  True),
+        (_c4, "윗몸말아올리기",  "💪",  _my_su,    _nat_su,   "회",  True),
+    ]
+    _deficit_areas = []
+    for col, label, icon, mv, nv, unit, hib in _metrics:
+        html, good = _cmp_card(label, icon, mv, nv, unit, hib)
+        col.markdown(html, unsafe_allow_html=True)
+        if not good and label not in ("BMI", "키"):
+            _deficit_areas.append(label)
+
+    # BMI 상태
+    if _my_bmi6 < 18.5:
+        _bmi6_lbl, _bmi6_clr = "저체중", "#5C6BC0"
+    elif _my_bmi6 < 23:
+        _bmi6_lbl, _bmi6_clr = "정상", "#43A047"
+    elif _my_bmi6 < 25:
+        _bmi6_lbl, _bmi6_clr = "과체중", "#FB8C00"
+    else:
+        _bmi6_lbl, _bmi6_clr = "비만", "#E53935"
+
     st.markdown(
-        f"<div style='background:{_ov_color}12;border:3px solid {_ov_color};"
-        f"border-radius:14px;padding:16px;text-align:center;margin:14px 0;'>"
-        f"<div style='font-size:15px;color:#555;'>종합 체력 등급</div>"
-        f"<div style='font-size:52px;font-weight:bold;color:{_ov_color};line-height:1.1;'>{_overall_g}등급</div>"
-        f"<div style='font-size:17px;color:{_ov_color};font-weight:bold;'>{_ov_label}</div>"
-        f"<div style='font-size:12px;color:#888;margin-top:4px;'>5대 체력 평균 ({_avg_g:.1f})</div>"
+        f"<div style='background:#F8F9FA;border-radius:10px;padding:10px 16px;"
+        f"margin-top:8px;font-size:14px;'>"
+        f"📋 <b>종합:</b> BMI {_my_bmi6} "
+        f"<b style='color:{_bmi6_clr};'>({_bmi6_lbl})</b> · "
+        f"전국평균 BMI {_nat_bmi6} · "
+        f"{'✅ 체력 측정 2항목 모두 전국 평균 이상' if not _deficit_areas else '⚠️ 전국 평균 미달 항목: ' + ', '.join(_deficit_areas)}"
         f"</div>",
         unsafe_allow_html=True,
     )
 
-    # 취약 / 강점 영역
-    _weak = [a for a, g in _paps_grades.items() if g >= 4]
-    _strong = [a for a, g in _paps_grades.items() if g <= 2]
-
-    if _weak:
-        st.markdown(
-            f"<div style='background:#FFF3E0;border-left:4px solid #FB8C00;"
-            f"border-radius:6px;padding:10px 14px;margin:4px 0;'>"
-            f"⚠️ <b>집중 보완 필요:</b> {' · '.join(_weak)}</div>",
-            unsafe_allow_html=True,
-        )
-    if _strong:
-        st.markdown(
-            f"<div style='background:#E8F5E9;border-left:4px solid #43A047;"
-            f"border-radius:6px;padding:10px 14px;margin:4px 0;'>"
-            f"✅ <b>우수 영역:</b> {' · '.join(_strong)}</div>",
-            unsafe_allow_html=True,
-        )
+    # ── 연도별 트렌드 ─────────────────────────────────────
+    st.markdown("---")
+    st.markdown("##### 📈 전국 평균 연도별 트렌드 (2019→2022→2023)")
+    import pandas as _pd6
+    _years = ["2019", "2022", "2023"]
+    _trend_j  = [_ns_ref["제자리멀리뛰기"][y] for y in _years]
+    _trend_su = [_ns_ref["윗몸말아올리기"][y] for y in _years]
+    _ta, _tb = st.columns(2)
+    with _ta:
+        st.caption("🦘 제자리멀리뛰기 (cm)")
+        _df_j = _pd6.DataFrame({"전국평균": _trend_j, "내 기록": [_my_j]*3}, index=_years)
+        st.line_chart(_df_j)
+    with _tb:
+        st.caption("💪 윗몸말아올리기 (회/분)")
+        _df_su = _pd6.DataFrame({"전국평균": _trend_su, "내 기록": [_my_su]*3}, index=_years)
+        st.line_chart(_df_su)
 
     st.markdown("---")
 
-    # ── 급식 × 체력 연계 영양 추천 ───────────────────────
-    st.markdown("##### 🍽️ 오늘 급식 × 체력 연계 분석")
+    # ── ④ 급식 연계 분석 ─────────────────────────────────
+    st.markdown("##### 🍽️ 오늘 급식 × 체력 수준 연계 분석")
+
+    _DEFICIT_NUTRITION = {
+        "제자리멀리뛰기": {
+            "label": "순발력·근력",
+            "icon": "🦘",
+            "color": "#FB8C00",
+            "nutrients": ["단백질", "칼슘", "비타민D", "탄수화물"],
+            "foods": ["닭고기", "우유", "달걀", "현미밥"],
+            "tip": "순발력은 근섬유 발달에 필요한 단백질과 에너지원인 탄수화물이 핵심입니다.",
+        },
+        "윗몸말아올리기": {
+            "label": "근지구력",
+            "icon": "💪",
+            "color": "#1E88E5",
+            "nutrients": ["단백질", "철분", "비타민B군", "마그네슘"],
+            "foods": ["소고기", "시금치", "콩류", "견과류"],
+            "tip": "근지구력 향상을 위해 근육 유지에 필요한 단백질과 피로 회복에 도움되는 철분이 중요합니다.",
+        },
+    }
 
     with st.spinner("급식 데이터 불러오는 중..."):
-        _paps_meal, _ = fetch_meal(
+        _ns_meal, _ = fetch_meal(
             st.session_state.cur_date, school["office"], school["code"]
         )
-    _paps_lunch = _paps_meal.get(2, {}).get("menu", "") if _paps_meal else ""
+    _ns_lunch = _ns_meal.get(2, {}).get("menu", "") if _ns_meal else ""
+    _ns_kcal  = _ns_meal.get(2, {}).get("kcal", "")  if _ns_meal else ""
 
-    if _paps_lunch:
+    if _ns_lunch:
+        _kcal_disp = re.sub(r'\(해당.*?\)', '', _ns_kcal).strip()
+        _kcal_html6 = f'<div style="color:#888;font-size:13px;margin-top:6px;">🔥 {_kcal_disp}</div>' if _kcal_disp else ''
         st.markdown(
             f"<div class='meal-card' style='border-left:4px solid {clr};'>"
             f"<div class='meal-title' style='color:{clr};'>🍚 오늘 점심</div>"
-            f"<div class='meal-menu'>{_paps_lunch}</div></div>",
+            f"<div class='meal-menu'>{_ns_lunch}</div>"
+            f"{_kcal_html6}</div>",
             unsafe_allow_html=True,
         )
     else:
         st.info("오늘 급식 데이터가 없습니다.")
 
-    # 취약 영역별 영양 추천 카드
-    if _weak:
-        st.markdown("##### 💊 취약 체력 보완 영양 계획")
-        for area in _weak:
-            info = PAPS_AREAS[area]
+    if _deficit_areas:
+        st.markdown("##### 💊 전국 평균 미달 체력 보완 영양 계획")
+        for area in _deficit_areas:
+            info = _DEFICIT_NUTRITION.get(area, {})
+            if not info:
+                continue
             ac = info["color"]
             st.markdown(
                 f"<div style='background:{ac}10;border-left:4px solid {ac};"
                 f"border-radius:8px;padding:12px 16px;margin:8px 0;'>"
                 f"<div style='font-weight:bold;color:{ac};font-size:15px;'>"
-                f"{info['icon']} {area} {_paps_grades[area]}등급 → 강화 영양 계획</div>"
-                f"<div style='font-size:13px;color:#555;margin-top:6px;'>{info['tip']}</div>"
+                f"{info['icon']} {area} ({info['label']}) — 전국 평균 대비 "
+                f"{_ns_ref[area]['2023'] - (float(_my_j) if area=='제자리멀리뛰기' else float(_my_su)):.1f} 부족</div>"
+                f"<div style='font-size:13px;color:#555;margin-top:5px;'>{info['tip']}</div>"
                 f"<div style='margin-top:8px;'>"
                 + "".join(
                     f"<span style='background:{ac}22;color:{ac};border:1px solid {ac}44;"
@@ -2187,113 +2253,122 @@ with tab6:
                     f"display:inline-block;'>🔹 {n}</span>"
                     for n in info["nutrients"]
                 )
-                + f"</div>"
-                f"<div style='font-size:12px;color:#666;margin-top:6px;'>"
-                f"🛒 보충 식품 추천: <b>{', '.join(info['foods'])}</b></div>"
-                f"</div>",
+                + f"</div><div style='font-size:12px;color:#666;margin-top:6px;'>"
+                f"🛒 보충 식품: <b>{', '.join(info['foods'])}</b></div></div>",
                 unsafe_allow_html=True,
             )
-
-    # ── AI PAPS × 급식 맞춤 분석 ──────────────────────────
-    st.markdown("---")
-    _paps_ai_key = _get_groq_key()
-
-    if not _paps_ai_key:
-        st.info("💡 AI 분석은 **개인 맞춤 식단 분석** 탭에서 Groq API 키를 입력하면 활성화됩니다.")
-    elif not _paps_lunch:
-        st.info("오늘 급식 데이터가 없어 AI 연계 분석을 수행할 수 없습니다.")
     else:
-        _paps_ai_cache = (
-            f"paps_ai_{st.session_state.cur_date.strftime('%Y%m%d')}"
-            f"_{school['code']}_{''.join(str(v) for v in _paps_grades.values())}"
+        st.success("✅ 두 체력 항목 모두 전국 평균 이상입니다! 현재 식단을 유지하세요.")
+
+    # ── AI 통합 분석 ──────────────────────────────────────
+    st.markdown("---")
+    _ns_ai_key = _get_groq_key()
+
+    if not _ns_ai_key:
+        st.info("💡 AI 분석은 **개인 맞춤 식단 분석** 탭에서 Groq API 키를 입력하면 활성화됩니다.")
+    elif not _ns_lunch:
+        st.info("오늘 급식 데이터가 없어 AI 분석을 수행할 수 없습니다.")
+    else:
+        _ns_cache = (
+            f"ns_ai_{st.session_state.cur_date.strftime('%Y%m%d')}"
+            f"_{school['code']}_{_ns_school}_{_ns_gender}"
+            f"_{int(_my_j)}_{int(_my_su)}"
         )
+        if st.button("🤖 AI 체력 × 급식 통합 분석", type="primary",
+                     use_container_width=True, key="ns_ai_btn"):
+            _ns_prompt = f"""학생 건강 데이터:
+- 학교급/성별: {_ns_school}학교 {_ns_gender}
+- 키: {_my_h6}cm (전국평균 {_nat_h}cm, 차이 {_my_h6-_nat_h:+.1f})
+- 몸무게: {_my_w6}kg (전국평균 {_nat_w}kg, 차이 {_my_w6-_nat_w:+.1f})
+- BMI: {_my_bmi6} ({_bmi6_lbl}) / 전국평균 BMI {_nat_bmi6}
+- 제자리멀리뛰기: {_my_j}cm (전국평균 {_nat_j}cm, 차이 {_my_j-_nat_j:+.1f})
+- 윗몸말아올리기: {_my_su}회/분 (전국평균 {_nat_su}회/분, 차이 {_my_su-_nat_su:+.1f})
+- 전국평균 미달 항목: {', '.join(_deficit_areas) if _deficit_areas else '없음 (모두 평균 이상)'}
 
-        if st.button("🤖 AI PAPS × 급식 맞춤 분석", type="primary",
-                     use_container_width=True, key="paps_ai_btn"):
-            _paps_prompt = f"""학생 정보:
-- 학교급/학년/성별: {_paps_school}학교 {_paps_grade}학년 {_paps_gender}
-- PAPS 체력 등급: {', '.join(f'{a}({g}등급-{GRADE_LABELS[g]})' for a, g in _paps_grades.items())}
-- 종합 등급: {_overall_g}등급 ({_ov_label})
-- 취약 영역: {', '.join(_weak) if _weak else '없음'}
-- 우수 영역: {', '.join(_strong) if _strong else '없음'}
+오늘 점심 급식:
+{_ns_lunch}
 
-오늘 점심 급식 메뉴:
-{_paps_lunch}
-
-위 학생의 PAPS 체력 등급과 오늘 급식을 분석하여 아래 JSON 형식으로만 응답하세요 (설명 없이 JSON만):
+위 데이터를 분석하여 아래 JSON 형식으로만 응답하세요 (설명 없이 JSON만):
 {{
-  "fitness_meal_match": "오늘 급식이 이 학생의 체력 향상에 얼마나 적합한지 한 줄 평가",
-  "strength_nutrients": ["오늘 급식에서 체력에 도움되는 영양소1", "영양소2", "영양소3"],
-  "weak_improvements": [
-    {{"area": "취약 체력 영역명", "meal_gap": "오늘 급식에서 부족한 점(15자 이내)", "evening_recommend": "저녁 보완 추천 메뉴"}}
+  "overall_assessment": "학생의 체력 수준과 체형에 대한 종합 평가 (2문장)",
+  "meal_fitness_score": "오늘 급식이 이 학생의 체력 향상에 기여하는 정도 (상/중/하)",
+  "meal_feedback": "오늘 급식의 체력 관점 강점과 약점 (2문장)",
+  "deficit_plans": [
+    {{"item": "전국평균 미달 항목명", "nutrient_gap": "급식에서 부족한 영양소", "action": "저녁·간식 보완 방법"}}
   ],
-  "exercise_tip": "오늘 급식 후 이 학생에게 맞는 운동 1가지 추천 (강도·시간 포함)",
-  "weekly_plan": "이번 주 체력 향상을 위한 식단+운동 계획 (2~3문장)"
+  "exercise_plan": "이 학생에게 맞는 주 3회 운동 계획 (구체적 종목·시간 포함)",
+  "weekly_diet_tip": "체력 향상을 위한 이번 주 식단 핵심 조언 (1~2문장)"
 }}"""
 
-            with st.spinner("🤖 AI가 PAPS와 급식을 연계 분석 중..."):
+            with st.spinner("🤖 체력 데이터와 급식을 종합 분석 중..."):
                 try:
-                    _raw = _call_groq(_paps_ai_key, _paps_prompt, max_tokens=1024)
+                    _raw = _call_groq(_ns_ai_key, _ns_prompt, max_tokens=1200)
                     if "```json" in _raw:
                         _raw = _raw.split("```json")[1].split("```")[0].strip()
                     elif "```" in _raw:
                         _raw = _raw.split("```")[1].split("```")[0].strip()
-                    st.session_state[_paps_ai_cache] = json.loads(_raw)
+                    st.session_state[_ns_cache] = json.loads(_raw)
                 except Exception as _e:
                     st.error(f"AI 분석 오류: {_e}")
 
-        if st.session_state.get(_paps_ai_cache):
-            _pr = st.session_state[_paps_ai_cache]
+        if st.session_state.get(_ns_cache):
+            _nr = st.session_state[_ns_cache]
 
-            # 급식-체력 매칭 평가
+            # 종합 평가
+            _score_color = {"상": "#43A047", "중": "#FB8C00", "하": "#EF5350"}.get(
+                _nr.get("meal_fitness_score", "중"), "#888")
             st.markdown(
-                f"<div style='background:#E3F2FD;border-left:4px solid #1E88E5;"
-                f"border-radius:8px;padding:12px 16px;margin:8px 0;'>"
-                f"<b style='color:#1E88E5;'>🍽️ 급식 × 체력 매칭 평가</b><br>"
-                f"<span style='font-size:14px;'>{_pr.get('fitness_meal_match','')}</span></div>",
+                f"<div style='background:#F8F9FA;border-radius:10px;padding:14px 18px;margin:8px 0;'>"
+                f"<b style='font-size:15px;'>📋 종합 평가</b>"
+                f"<span style='float:right;background:{_score_color}22;color:{_score_color};"
+                f"border:1px solid {_score_color};border-radius:20px;padding:2px 12px;"
+                f"font-size:13px;font-weight:bold;'>급식 기여도 {_nr.get('meal_fitness_score','')}</span>"
+                f"<div style='margin-top:8px;font-size:14px;line-height:1.7;'>"
+                f"{_nr.get('overall_assessment','')}</div></div>",
                 unsafe_allow_html=True,
             )
 
-            # 강점 영양소
-            _sn = _pr.get("strength_nutrients", [])
-            if _sn:
-                st.markdown(
-                    "<b>✅ 오늘 급식의 체력 기여 영양소:</b> "
-                    + " &nbsp;·&nbsp; ".join(f"`{n}`" for n in _sn)
-                )
+            # 급식 피드백
+            st.markdown(
+                f"<div style='background:#E3F2FD;border-left:4px solid #1E88E5;"
+                f"border-radius:8px;padding:12px 16px;margin:8px 0;'>"
+                f"<b style='color:#1E88E5;'>🍽️ 오늘 급식 체력 피드백</b><br>"
+                f"<span style='font-size:14px;'>{_nr.get('meal_feedback','')}</span></div>",
+                unsafe_allow_html=True,
+            )
 
-            # 취약 영역별 개선 계획
-            _wi = _pr.get("weak_improvements", [])
-            if _wi:
-                st.markdown("##### 🔧 취약 영역별 저녁 보완 계획")
-                for item in _wi:
-                    _ia = item.get("area", "")
-                    _ic = PAPS_AREAS.get(_ia, {}).get("color", "#888")
+            # 미달 항목 보완 계획
+            _dp = _nr.get("deficit_plans", [])
+            if _dp:
+                st.markdown("##### 🔧 미달 항목 보완 계획")
+                for item in _dp:
+                    _ia = item.get("item", "")
+                    _ic = _DEFICIT_NUTRITION.get(_ia, {}).get("color", "#888")
                     st.markdown(
                         f"<div style='background:{_ic}10;border:1px solid {_ic}44;"
                         f"border-radius:8px;padding:10px 14px;margin:6px 0;'>"
-                        f"<b style='color:{_ic};'>{_ia}</b> — {item.get('meal_gap','')}<br>"
-                        f"🌙 저녁 보완 추천: <b>{item.get('evening_recommend','')}</b></div>",
+                        f"<b style='color:{_ic};'>{_ia}</b> — 부족 영양소: {item.get('nutrient_gap','')}<br>"
+                        f"💡 보완 방법: <b>{item.get('action','')}</b></div>",
                         unsafe_allow_html=True,
                     )
 
-            # 운동 & 주간 계획
-            _ea2, _eb2 = st.columns(2)
-            with _ea2:
+            # 운동 계획 + 식단 조언
+            _ra, _rb = st.columns(2)
+            with _ra:
                 st.markdown(
                     f"<div class='meal-card' style='border-left:4px solid #FB8C00;'>"
-                    f"<div class='meal-title' style='color:#FB8C00;'>🏃 오늘의 운동 추천</div>"
-                    f"<div style='font-size:14px;line-height:1.7;'>{_pr.get('exercise_tip','')}</div>"
+                    f"<div class='meal-title' style='color:#FB8C00;'>🏃 주 3회 운동 계획</div>"
+                    f"<div style='font-size:14px;line-height:1.8;'>{_nr.get('exercise_plan','')}</div>"
                     f"</div>",
                     unsafe_allow_html=True,
                 )
-            with _eb2:
+            with _rb:
                 st.markdown(
                     f"<div class='meal-card' style='border-left:4px solid #43A047;'>"
-                    f"<div class='meal-title' style='color:#43A047;'>📅 이번 주 계획</div>"
-                    f"<div style='font-size:14px;line-height:1.7;'>{_pr.get('weekly_plan','')}</div>"
+                    f"<div class='meal-title' style='color:#43A047;'>🥗 이번 주 식단 핵심 조언</div>"
+                    f"<div style='font-size:14px;line-height:1.8;'>{_nr.get('weekly_diet_tip','')}</div>"
                     f"</div>",
                     unsafe_allow_html=True,
                 )
 
-            st.caption("🤖 Groq AI (llama-3.3-70b) 분석 · 참고용 정보입니다")
+            st.caption("🤖 Groq AI (llama-3.3-70b) · 한국교육개발원 통계 기반 · 참고용 정보입니다")
