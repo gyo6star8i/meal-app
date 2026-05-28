@@ -862,6 +862,38 @@ def _weekly_report_with_ai(week_meals: dict, school_type: str, api_key: str) -> 
         return f"오류: {e}"
 
 
+def _analyze_meal_with_ai(menu: str, school_type: str, api_key: str) -> dict:
+    """오늘 급식 메뉴 AI 영양 분석 및 저녁/간식 추천"""
+    prompt = f"""오늘 {school_type} 점심 급식 메뉴입니다:
+{menu}
+
+위 급식의 영양 구성을 분석하고, 아래 JSON 형식으로만 응답해주세요 (다른 텍스트 없이):
+{{
+  "nutrition_summary": "이 급식의 영양 구성 한 줄 요약",
+  "missing_nutrients": ["부족한 영양소1", "부족한 영양소2", "부족한 영양소3"],
+  "dinner": {{
+    "menu": "저녁 추천 메뉴 (예: 현미밥 + 닭가슴살 구이)",
+    "reason": "추천 이유 한 문장"
+  }},
+  "snack": {{
+    "menu": "간식 추천 (예: 방울토마토)",
+    "reason": "추천 이유 한 문장"
+  }},
+  "shopping_list": ["재료1", "재료2", "재료3", "재료4", "재료5"],
+  "weekly_tip": "이번 주 영양 균형을 위한 한 줄 조언"
+}}"""
+
+    try:
+        raw = _call_groq(api_key, prompt, max_tokens=1024)
+        if "```json" in raw:
+            raw = raw.split("```json")[1].split("```")[0].strip()
+        elif "```" in raw:
+            raw = raw.split("```")[1].split("```")[0].strip()
+        return json.loads(raw)
+    except Exception as e:
+        return {"error": str(e)}
+
+
 def _get_groq_key() -> str:
     """Streamlit secrets 또는 session_state 에서 Groq API 키 반환"""
     try:
