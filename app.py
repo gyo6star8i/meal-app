@@ -717,6 +717,29 @@ with tab4:
         except Exception as e:
             return f"오류: {e}"
 
+    # ── 식품의약품안전처 영양성분 DB 조회 (curl subprocess) ────────
+    def _fetch_nutrition_curl(food_name: str) -> dict:
+        """식약처 통합식품영양성분 DB API 조회 - curl 사용 (SSL 프록시 우회)"""
+        import subprocess, json as _json, urllib.parse
+        NUTRI_API_KEY = (
+            "ca41a09537bd54e63daaa0dbbc32539394e7c0244d1aff5afb879d09240edeb8"
+        )
+        encoded = urllib.parse.quote(food_name)
+        url = (
+            "https://api.data.go.kr/openapi/tn_pubr_public_nutri_food_info_api"
+            f"?serviceKey={NUTRI_API_KEY}&pageNo=1&numOfRows=3&type=json&foodNm={encoded}"
+        )
+        try:
+            result = subprocess.run(
+                ["curl", "-k", "-s", "--max-time", "8", url],
+                capture_output=True, text=True, timeout=12,
+            )
+            data = _json.loads(result.stdout)
+            items = data.get("response", {}).get("body", {}).get("items", [])
+            return items[0] if isinstance(items, list) and items else {}
+        except Exception:
+            return {}
+
     # ── UI ───────────────────────────────────────────────────
     st.markdown(
         f"<div style='background:{clr};border-radius:12px;padding:16px 20px;"
@@ -777,6 +800,101 @@ with tab4:
             )
         else:
             st.info("오늘 급식 데이터가 없습니다. 날짜를 확인해주세요.")
+
+        # ── 식약처 영양성분 DB 조회 버튼 ──────────────────────────
+        if lunch_menu:
+            # HTML 태그 제거 후 메뉴 아이템 파싱
+            _clean = re.sub(r"<[^>]+>", "\n", lunch_menu)
+            _raw_items = [x.strip() for x in _clean.replace(",", "\n").split("\n") if x.strip()]
+            _menu_items = [
+                re.sub(r"\(.*?\)", "", x).strip()
+                for x in _raw_items
+                if len(re.sub(r"\(.*?\)", "", x).strip()) >= 2
+            ]
+
+            if st.button("🔬 영양성분 DB 조회", key="t4_nutri_btn", use_container_width=True,
+                         help="식품의약품안전처 통합식품영양성분 DB에서 각 메뉴의 영양소를 조회합니다"):
+                _nutri = {}
+                prog = st.progress(0, text="식약처 영양성분 DB 조회 중...")
+                for _i, _item in enumerate(_menu_items[:8]):
+                    prog.progress((_i + 1) / min(len(_menu_items), 8),
+                                  text=f"조회 중: {_item}")
+                    _info = _fetch_nutrition_curl(_item)
+                    if _info:
+                        _nutri[_item] = _info
+                prog.empty()
+                st.session_state["t4_nutri"] = _nutri
+                if not _nutri:
+                    st.session_state["t4_nutri_empty"] = True
+
+        if st.session_state.get("t4_nutri_empty"):
+            st.warning("영양성분 DB에서 오늘 메뉴 항목을 찾지 못했습니다. (식품명 불일치 또는 네트워크 오류)")
+            st.session_state.pop("t4_nutri_empty", None)
+
+        if "t4_nutri" in st.session_state and st.session_state["t4_nutri"]:
+            _nutri_data = st.session_state["t4_nutri"]
+            with st.expander(
+                f"🔬 식약처 영양성분 DB 분석 — {len(_nutri_data)}개 메뉴 조회됨",
+                expanded=True,
+            ):
+                st.caption(
+                    "📊 출처: 식품의약품안전처 통합식품영양성분 DB (data.go.kr) · "
+                    "1인 1회 제공량 기준"
+                )
+                for _food, _info in _nutri_data.items():
+                    _kcal  = _info.get("enerc", "")
+                    _prot  = _info.get("prot", "")
+                    _fat   = _info.get("fatce", "")
+                    _carb  = _info.get("chocdf", "")
+                    _fiber = _info.get("fibtg", "")
+                    _ca    = _info.get("ca", "")
+                    _na    = _info.get("nat", "")
+                    _vitc  = _info.get("vitc", "")
+                    _db_nm = _info.get("foodNm", _food)
+
+                    st.markdown(
+                        f"<div style='background:#F8F9FA;border-radius:10px;"
+                        f"padding:10px 14px;margin:6px 0;border-left:3px solid #4CAF50;'>"
+                        f"<b style='font-size:15px;'>🍽️ {_food}</b>"
+                        f"<span style='color:#888;font-size:12px;margin-left:8px;'>DB명: {_db_nm}</span>"
+                        f"<div style='display:flex;flex-wrap:wrap;gap:8px;margin-top:6px;'>",
+                        unsafe_allow_html=True,
+                    )
+                    _badges = [
+                        ("🔥", "열량",   _kcal,  "kcal", "#FF5722"),
+                        ("💪", "단백질", _prot,  "g",    "#2196F3"),
+                        ("🌾", "탄수화물",_carb, "g",    "#FF9800"),
+                        ("🫙", "지방",   _fat,   "g",    "#9C27B0"),
+                        ("🌿", "식이섬유",_fiber,"g",    "#4CAF50"),
+                        ("🦴", "칼슘",   _ca,    "mg",   "#00BCD4"),
+                        ("🧂", "나트륨", _na,    "mg",   "#607D8B"),
+                        ("🍋", "비타민C",_vitc, "mg",   "#FFEB3B"),
+                    ]
+                    _badge_html = ""
+                    for _icon, _label, _val, _unit, _color in _badges:
+                        if _val:
+                            _badge_html += (
+                                f"<span style='background:{_color}18;color:{_color};"
+                                f"border:1px solid {_color}44;border-radius:20px;"
+                                f"padding:3px 9px;font-size:12px;white-space:nowrap;'>"
+                                f"{_icon} {_label} <b>{_val}{_unit}</b></span>"
+                            )
+                    st.markdown(_badge_html + "</div></div>", unsafe_allow_html=True)
+
+                # 합산 칼로리
+                _total_kcal = 0.0
+                for _info in _nutri_data.values():
+                    try:
+                        _total_kcal += float(_info.get("enerc", 0) or 0)
+                    except (ValueError, TypeError):
+                        pass
+                if _total_kcal > 0:
+                    st.markdown(
+                        f"<div style='text-align:right;font-size:13px;color:#555;"
+                        f"margin-top:4px;'>🔥 조회된 메뉴 합산 열량: "
+                        f"<b>{_total_kcal:.0f} kcal</b></div>",
+                        unsafe_allow_html=True,
+                    )
 
         st.markdown("---")
 
