@@ -717,28 +717,65 @@ with tab4:
         except Exception as e:
             return f"오류: {e}"
 
-    # ── 식품의약품안전처 영양성분 DB 조회 (curl subprocess) ────────
+    # ── 식품의약품안전처 영양성분 DB 조회 ──────────────────────────
     def _fetch_nutrition_curl(food_name: str) -> dict:
-        """식약처 통합식품영양성분 DB API 조회 - curl 사용 (SSL 프록시 우회)"""
-        import subprocess, json as _json, urllib.parse
+        """식약처 통합식품영양성분 DB API 조회
+        - requests(verify=False) 우선 시도 → Streamlit Cloud 등 일반 환경
+        - 실패 시 curl subprocess 폴백 → 학교 SSL 프록시 환경
+        """
+        import subprocess, json as _json, urllib.parse, re as _re2
+        # ① 식품명 정리: *, 숫자, 괄호 등 알레르기 마커 완전 제거
+        clean = _re2.sub(r"\(.*?\)", "", food_name)   # (1.2.5) 형태 제거
+        clean = _re2.sub(r"[\*\[\]\d\.\s]+$", "", clean).strip()  # 뒤쪽 * 및 숫자 제거
+        clean = _re2.sub(r"^\s*[\*\d]+\s*", "", clean).strip()   # 앞쪽 * 및 숫자 제거
+        if len(clean) < 2:
+            return {}
+
         NUTRI_API_KEY = (
             "ca41a09537bd54e63daaa0dbbc32539394e7c0244d1aff5afb879d09240edeb8"
         )
-        encoded = urllib.parse.quote(food_name)
-        url = (
-            "https://api.data.go.kr/openapi/tn_pubr_public_nutri_food_info_api"
-            f"?serviceKey={NUTRI_API_KEY}&pageNo=1&numOfRows=3&type=json&foodNm={encoded}"
-        )
-        try:
-            result = subprocess.run(
-                ["curl", "-k", "-s", "--max-time", "8", url],
-                capture_output=True, text=True, timeout=12,
+
+        def _do_query(name: str) -> dict:
+            encoded = urllib.parse.quote(name)
+            url = (
+                "https://api.data.go.kr/openapi/tn_pubr_public_nutri_food_info_api"
+                f"?serviceKey={NUTRI_API_KEY}&pageNo=1&numOfRows=3&type=json&foodNm={encoded}"
             )
-            data = _json.loads(result.stdout)
-            items = data.get("response", {}).get("body", {}).get("items", [])
-            return items[0] if isinstance(items, list) and items else {}
-        except Exception:
+            # 방법 1: requests verify=False (Streamlit Cloud / 일반 환경)
+            try:
+                import requests as _req, urllib3 as _u3
+                _u3.disable_warnings(_u3.exceptions.InsecureRequestWarning)
+                r = _req.get(url, verify=False, timeout=8)
+                data = r.json()
+                items = data.get("response", {}).get("body", {}).get("items", [])
+                if isinstance(items, list) and items:
+                    return items[0]
+            except Exception:
+                pass
+            # 방법 2: curl subprocess (학교 네트워크 SSL 프록시 환경)
+            try:
+                result = subprocess.run(
+                    ["curl", "-k", "-s", "--max-time", "8", url],
+                    capture_output=True, text=True, timeout=12,
+                )
+                data = _json.loads(result.stdout)
+                items = data.get("response", {}).get("body", {}).get("items", [])
+                if isinstance(items, list) and items:
+                    return items[0]
+            except Exception:
+                pass
             return {}
+
+        # 전체 이름으로 먼저 시도
+        res = _do_query(clean)
+        if res:
+            return res
+        # 긴 복합어(6자 초과)는 앞 절반으로 재시도 (예: 망고블루베리요거트샐러드 → 망고블루베리)
+        if len(clean) > 6:
+            res = _do_query(clean[: len(clean) // 2 + 1])
+            if res:
+                return res
+        return {}
 
     # ── UI ───────────────────────────────────────────────────
     st.markdown(
@@ -806,10 +843,15 @@ with tab4:
             # HTML 태그 제거 후 메뉴 아이템 파싱
             _clean = re.sub(r"<[^>]+>", "\n", lunch_menu)
             _raw_items = [x.strip() for x in _clean.replace(",", "\n").split("\n") if x.strip()]
+            def _clean_food(s):
+                s = re.sub(r"\(.*?\)", "", s)          # (1.2.5) 알레르기 코드 제거
+                s = re.sub(r"[\*\[\]\d\.\s]+$", "", s) # 뒤쪽 * 및 숫자 제거
+                s = re.sub(r"^\s*[\*\d]+\s*", "", s)   # 앞쪽 * 및 숫자 제거
+                return s.strip()
             _menu_items = [
-                re.sub(r"\(.*?\)", "", x).strip()
+                _clean_food(x)
                 for x in _raw_items
-                if len(re.sub(r"\(.*?\)", "", x).strip()) >= 2
+                if len(_clean_food(x)) >= 2
             ]
 
             if st.button("🔬 영양성분 DB 조회", key="t4_nutri_btn", use_container_width=True,
