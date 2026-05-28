@@ -526,7 +526,7 @@ st.markdown(
 )
 st.markdown(
     f"<p style='color:#888;margin-top:4px;'>"
-    f"BY LEE YANG-HO · NEIS 급식 공개 API</p>",
+    f"BY LEE YANG-HO & HEE-MYEONG · NEIS 급식 공개 API</p>",
     unsafe_allow_html=True,
 )
 
