@@ -531,6 +531,22 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
+# ── 공통 신체정보 입력 (건강기준비교·PAPS 탭 공유) ──────────────────
+with st.expander("👤 내 신체정보 입력 (건강기준·PAPS 탭 공통 적용)", expanded=False):
+    _si1, _si2, _si3, _si4, _si5 = st.columns(5)
+    with _si1:
+        st.selectbox("학교급", ["초", "중", "고"], key="hc_school")
+    with _si2:
+        _gmap = {"초": ["1","2","3","4","5","6"], "중": ["1","2","3"], "고": ["1","2","3"]}
+        st.selectbox("학년", _gmap.get(st.session_state.get("hc_school", "중"), ["1","2","3"]), key="hc_grade")
+    with _si3:
+        st.selectbox("성별", ["남", "여"], key="hc_gender")
+    with _si4:
+        st.number_input("키 (cm)", min_value=100.0, max_value=220.0, value=160.0, step=0.1, key="hc_h")
+    with _si5:
+        st.number_input("몸무게 (kg)", min_value=20.0, max_value=150.0, value=55.0, step=0.1, key="hc_w")
+    st.caption("💡 여기서 입력한 정보가 🏥 건강기준비교 탭과 💪 PAPS 체력분석 탭에 자동으로 연동됩니다.")
+
 # 탭 구성
 tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(["📅 오늘의 급식", "📋 주간 급식", "📊 칼로리 분석", "🥗 개인 맞춤 식단 분석", "🏥 건강 기준 비교", "💪 PAPS 체력분석"])
 
@@ -1866,22 +1882,14 @@ with tab5:
     else:
         st.caption("학생건강검사 표본통계 (교육부, 2023-2025 / 269,013명 기반)")
 
-        # ── 프로필 입력 ──────────────────────────────────────
-        st.markdown("##### 내 정보 입력")
-        _hc1, _hc2, _hc3 = st.columns(3)
-        with _hc1:
-            _school_sel = st.selectbox("학교급", ["초", "중", "고"], key="hc_school")
-        with _hc2:
-            _grade_map_hc = {"초": ["1","2","3","4","5","6"], "중": ["1","2","3"], "고": ["1","2","3"]}
-            _grade_sel = st.selectbox("학년", _grade_map_hc.get(_school_sel, ["1"]), key="hc_grade")
-        with _hc3:
-            _gender_sel = st.selectbox("성별", ["남", "여"], key="hc_gender")
+        # ── 프로필: 상단 공통 섹션에서 가져오기 ─────────────────
+        _school_sel = st.session_state.get("hc_school", "중")
+        _grade_sel  = st.session_state.get("hc_grade", "1")
+        _gender_sel = st.session_state.get("hc_gender", "남")
+        _my_h       = float(st.session_state.get("hc_h", 160.0))
+        _my_w       = float(st.session_state.get("hc_w", 55.0))
 
-        _hk1, _hk2 = st.columns(2)
-        with _hk1:
-            _my_h = st.number_input("내 키 (cm)", min_value=100.0, max_value=220.0, value=160.0, step=0.1, key="hc_h")
-        with _hk2:
-            _my_w = st.number_input("내 몸무게 (kg)", min_value=20.0, max_value=150.0, value=55.0, step=0.1, key="hc_w")
+        st.info(f"👤 **{_school_sel}학교 {_grade_sel}학년 {_gender_sel}** · 키 {_my_h}cm · 몸무게 {_my_w}kg  ← 상단 **내 신체정보 입력**에서 수정")
 
         _my_bmi = round(_my_w / ((_my_h / 100) ** 2), 1)
 
@@ -2059,49 +2067,32 @@ with tab6:
     st.markdown("#### 💪 PAPS 체력 · 전국 평균 비교 및 급식 연계 분석")
     st.caption("출처: 한국교육개발원 교육통계연보 · 11세(초)·14세(중)·17세(고) 기준")
 
-    # ── 기본 정보 ──────────────────────────────────────────
-    st.markdown("##### 기본 정보")
-    _n1, _n2 = st.columns(2)
-    with _n1:
-        _ns_school = st.selectbox("학교급", ["초", "중", "고"], key="ns_school",
-                                  help="초=11세, 중=14세, 고=17세 기준 통계")
-    with _n2:
-        _ns_gender = st.selectbox("성별", ["남", "여"], key="ns_gender")
+    # ── 기본 정보: 상단 공통 섹션에서 가져오기 ───────────────
+    _ns_school = st.session_state.get("hc_school", "중")
+    _ns_gender = st.session_state.get("hc_gender", "남")
+    _my_h6     = float(st.session_state.get("hc_h", 160.0))
+    _my_w6     = float(st.session_state.get("hc_w", 55.0))
 
-    st.markdown("---")
+    st.info(f"👤 **{_ns_school}학교 {_ns_gender}** · 키 {_my_h6}cm · 몸무게 {_my_w6}kg  ← 상단 **내 신체정보 입력**에서 수정")
 
-    # ── 신체 측정값 입력 ───────────────────────────────────
-    st.markdown("##### 📏 신체 측정값 입력")
+    # ── 체력 측정값 입력 (PAPS 전용) ───────────────────────
+    st.markdown("##### 📏 체력 측정값 입력")
     _ns_ref = _NS[_ns_school][_ns_gender]
     _nat_h  = _ns_ref["키"]["2023"]
     _nat_w  = _ns_ref["몸무게"]["2023"]
     _nat_j  = _ns_ref["제자리멀리뛰기"]["2023"]
     _nat_su = _ns_ref["윗몸말아올리기"]["2023"]
 
-    _mi1, _mi2, _mi3, _mi4 = st.columns(4)
-    with _mi1:
-        _my_h6 = st.number_input(
-            f"키 (cm)\n전국평균 {_nat_h}",
-            min_value=100.0, max_value=220.0,
-            value=float(st.session_state.get("hc_h", _nat_h)),
-            step=0.1, key="ns_h",
-        )
-    with _mi2:
-        _my_w6 = st.number_input(
-            f"몸무게 (kg)\n전국평균 {_nat_w}",
-            min_value=20.0, max_value=150.0,
-            value=float(st.session_state.get("hc_w", _nat_w)),
-            step=0.1, key="ns_w",
-        )
+    _mi3, _mi4 = st.columns(2)
     with _mi3:
         _my_j = st.number_input(
-            f"제자리멀리뛰기 (cm)\n전국평균 {_nat_j}",
+            f"제자리멀리뛰기 (cm) · 전국평균 {_nat_j}",
             min_value=50.0, max_value=350.0,
             value=float(_nat_j), step=1.0, key="ns_jump",
         )
     with _mi4:
         _my_su = st.number_input(
-            f"윗몸말아올리기 (회/분)\n전국평균 {_nat_su}",
+            f"윗몸말아올리기 (회/분) · 전국평균 {_nat_su}",
             min_value=0.0, max_value=150.0,
             value=float(_nat_su), step=1.0, key="ns_situp",
         )
