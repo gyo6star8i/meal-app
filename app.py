@@ -780,7 +780,7 @@ with tab1:
                     st.caption("급식 유형: " + "  |  ".join(_meal_types))
 
                 # 연도별 트렌드 조회 버튼
-                if st.button("📈 3년 트렌드 보기", key="t1_si_trend"):
+                if st.button("📈 3년 트렌드 보기", key="t1_si_trend_btn"):
                     with st.spinner("3년 데이터 수집 중..."):
                         import pandas as _pd
                         _trend = {}
@@ -790,7 +790,7 @@ with tab1:
                                 school.get("type", "초등학교"), _ty,
                                 school_code=school.get("code", ""),
                             )
-                            if _td:
+                            if _td and isinstance(_td, dict):
                                 try:
                                     _trend[str(_ty)] = {
                                         "급식학생수": int(_td.get("MLSV_STDNT_FGR") or 0),
@@ -800,10 +800,10 @@ with tab1:
                                 except (TypeError, ValueError):
                                     pass
                     if _trend:
-                        st.session_state["t1_si_trend"] = _trend
+                        st.session_state["t1_si_trend_data"] = _trend
 
-                if "t1_si_trend" in st.session_state:
-                    _tr = st.session_state["t1_si_trend"]
+                if "t1_si_trend_data" in st.session_state and isinstance(st.session_state["t1_si_trend_data"], dict):
+                    _tr = st.session_state["t1_si_trend_data"]
                     import pandas as _pd2
                     try:
                         # 안전한 DataFrame 생성 (None/빈값 처리 포함)
