@@ -4,6 +4,8 @@ meal.py의 급식 조회/칼로리 분석 기능을 웹에서 제공합니다.
 """
 import sys, types, re, calendar, json
 from datetime import datetime, timedelta
+import zoneinfo as _zi
+_KST = _zi.ZoneInfo("Asia/Seoul")
 
 # ──────────────────────────────────────────────────────────
 # tkinter 목업 (서버 환경에서 meal.py 임포트를 위해 필요)
@@ -443,7 +445,7 @@ st.markdown("""
 # ──────────────────────────────────────────────────────────
 # 세션 상태 초기화
 # ──────────────────────────────────────────────────────────
-_today = datetime.today().replace(hour=0, minute=0, second=0, microsecond=0)
+_today = datetime.now(_KST).replace(hour=0, minute=0, second=0, microsecond=0, tzinfo=None)
 
 if "school" not in st.session_state:
     st.session_state.school = DEFAULT_SCHOOL.copy()
