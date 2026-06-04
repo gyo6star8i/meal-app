@@ -1456,24 +1456,24 @@ with tab4:
             encoded = urllib.parse.quote(name)
             url = (
                 "https://api.data.go.kr/openapi/tn_pubr_public_nutri_food_info_api"
-                f"?serviceKey={NUTRI_API_KEY}&pageNo=1&numOfRows=5&type=json&foodNm={encoded}"
+                f"?serviceKey={NUTRI_API_KEY}&pageNo=1&numOfRows=3&type=json&foodNm={encoded}"
             )
             import requests as _req, urllib3 as _u3
             _u3.disable_warnings(_u3.exceptions.InsecureRequestWarning)
-            # 방법 1: requests (Streamlit Cloud / 일반 환경)
             try:
-                r = _req.get(url, verify=False, timeout=8)
+                r = _req.get(url, verify=False, timeout=(3, 5))  # (connect, read)
                 if r.status_code == 200:
                     items = _extract_items(r.json())
                     if items:
                         return items[0]
+                return {}   # 200이지만 결과 없음 → curl 재시도 불필요
             except Exception:
                 pass
-            # 방법 2: curl 폴백 (학교 SSL 프록시 환경)
+            # curl 폴백: requests 자체가 실패(네트워크 오류)한 경우만
             try:
                 result = subprocess.run(
-                    ["curl", "-k", "-s", "--max-time", "8", url],
-                    capture_output=True, text=True, timeout=12,
+                    ["curl", "-k", "-s", "--max-time", "5", url],
+                    capture_output=True, text=True, timeout=7,
                 )
                 if result.stdout:
                     items = _extract_items(_json.loads(result.stdout))
@@ -1536,57 +1536,48 @@ with tab4:
                       "nat": "46", "vitc": "0"},
         }
 
-        # ④ 후보 목록 구성
+        # ④ 후보 목록 구성 (최대 5개로 제한 → API 호출 최소화)
         candidates = []
 
-        # 동의어 매핑 우선 적용
+        # 1순위: 동의어 직접 매핑
         if clean in SYNONYM_MAP:
             syn = SYNONYM_MAP[clean]
             if syn in HARDCODED:
                 return HARDCODED[syn]
             candidates.append(syn)
 
-        # 전체 이름
+        # 2순위: 원본 이름
         candidates.append(clean)
 
-        # 앞 수식어 제거 (2글자씩)
-        for skip in (2, 4):
-            if len(clean) > skip + 2:
-                trimmed = clean[skip:]
-                candidates.append(trimmed)
-                # 잘라낸 후에도 동의어 적용
+        # 3순위: 앞 2글자 수식어 제거
+        if len(clean) > 4:
+            trimmed = clean[2:]
+            if trimmed not in candidates:
                 if trimmed in SYNONYM_MAP:
                     syn = SYNONYM_MAP[trimmed]
                     if syn in HARDCODED:
                         return HARDCODED[syn]
                     candidates.append(syn)
+                else:
+                    candidates.append(trimmed)
 
-        # 접미사 기반 변환
+        # 4순위: 접미사 기반 변환 (첫 번째 매칭만)
         for suffix, replacement in SUFFIX_MAP:
-            if clean.endswith(suffix) and clean != suffix:
-                base = clean[: -len(suffix)]
-                if base:
-                    new_name = base + replacement
-                    candidates.append(new_name)
-                    # 기본 유사 음식도 후보에 추가
-                    candidates.append(replacement)
+            if clean.endswith(suffix) and clean != suffix and replacement not in candidates:
+                candidates.append(replacement)
+                break  # 첫 번째 매칭만 사용
 
-        # 뒤 3·2글자 (최후 수단)
-        if len(clean) > 3:
-            candidates.append(clean[-3:])
-        if len(clean) > 2:
-            candidates.append(clean[-2:])
-
-        # 중복 제거 (순서 유지)
+        # 중복 제거 (순서 유지), 최대 5개
         seen = set()
         unique = []
         for c in candidates:
             if c not in seen and len(c) >= 2:
                 seen.add(c)
                 unique.append(c)
+                if len(unique) >= 5:
+                    break
 
         for candidate in unique:
-            # 하드코딩 폴백 확인
             if candidate in HARDCODED:
                 return HARDCODED[candidate]
             res = _do_query(candidate)
