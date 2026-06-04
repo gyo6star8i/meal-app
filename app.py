@@ -439,6 +439,42 @@ st.markdown("""
         font-size: 13px;
         margin-top: 6px;
     }
+
+    /* ── 탭 스타일 커스터마이징 ── */
+    [data-baseweb="tab-list"] {
+        gap: 6px;
+        background: transparent;
+        padding: 4px 0 0 0;
+    }
+    button[data-baseweb="tab"] {
+        font-size: 15px;
+        font-weight: 600;
+        padding: 8px 16px;
+        border-radius: 22px;
+        border: 1.5px solid transparent;
+        background: var(--secondary-background-color);
+        color: var(--text-color);
+        transition: all 0.18s ease;
+        white-space: nowrap;
+    }
+    button[data-baseweb="tab"]:hover {
+        border-color: #2C5F2D;
+        color: #2C5F2D;
+        background: #2C5F2D18;
+    }
+    button[data-baseweb="tab"][aria-selected="true"] {
+        background: #2C5F2D !important;
+        color: #ffffff !important;
+        border-color: #2C5F2D !important;
+        box-shadow: 0 2px 8px #2C5F2D44;
+    }
+    /* 활성 탭 하단 밑줄 제거 */
+    [data-baseweb="tab-highlight"] {
+        display: none !important;
+    }
+    [data-baseweb="tab-border"] {
+        display: none !important;
+    }
 </style>
 """, unsafe_allow_html=True)
 
