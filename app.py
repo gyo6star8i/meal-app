@@ -1536,7 +1536,7 @@ with tab4:
                       "nat": "46", "vitc": "0"},
         }
 
-        # ④ 후보 목록 구성 (최대 5개로 제한 → API 호출 최소화)
+        # ④ 후보 목록 구성 (최대 10개)
         candidates = []
 
         # 1순위: 동의어 직접 매핑
@@ -1549,32 +1549,35 @@ with tab4:
         # 2순위: 원본 이름
         candidates.append(clean)
 
-        # 3순위: 앞 2글자 수식어 제거
-        if len(clean) > 4:
-            trimmed = clean[2:]
-            if trimmed not in candidates:
+        # 3순위: 앞 2·4글자 수식어 제거
+        for skip in (2, 4):
+            if len(clean) > skip + 2:
+                trimmed = clean[skip:]
                 if trimmed in SYNONYM_MAP:
                     syn = SYNONYM_MAP[trimmed]
                     if syn in HARDCODED:
                         return HARDCODED[syn]
                     candidates.append(syn)
-                else:
-                    candidates.append(trimmed)
+                candidates.append(trimmed)
 
-        # 4순위: 접미사 기반 변환 (첫 번째 매칭만)
+        # 4순위: 접미사 기반 변환 (매칭되는 것만, 최대 3개)
+        suffix_count = 0
         for suffix, replacement in SUFFIX_MAP:
-            if clean.endswith(suffix) and clean != suffix and replacement not in candidates:
-                candidates.append(replacement)
-                break  # 첫 번째 매칭만 사용
+            if clean.endswith(suffix) and clean != suffix:
+                if replacement not in candidates:
+                    candidates.append(replacement)
+                    suffix_count += 1
+                if suffix_count >= 3:
+                    break
 
-        # 중복 제거 (순서 유지), 최대 5개
+        # 중복 제거 (순서 유지), 최대 10개
         seen = set()
         unique = []
         for c in candidates:
             if c not in seen and len(c) >= 2:
                 seen.add(c)
                 unique.append(c)
-                if len(unique) >= 5:
+                if len(unique) >= 10:
                     break
 
         for candidate in unique:
@@ -1662,16 +1665,25 @@ with tab4:
 
             if st.button("🔬 영양성분 DB 조회", key="t4_nutri_btn", use_container_width=True,
                          help="식품의약품안전처 통합식품영양성분 DB에서 각 메뉴의 영양소를 조회합니다"):
-                import time as _time
+                from concurrent.futures import ThreadPoolExecutor, as_completed
                 _nutri = {}
-                _total = min(len(_menu_items), 9)
-                prog = st.progress(0, text="식약처 영양성분 DB 조회 중...")
-                for _i, _item in enumerate(_menu_items[:9]):
-                    prog.progress((_i + 1) / _total, text=f"조회 중: {_item}")
-                    _info = _fetch_nutrition_curl(_item)
-                    if _info:
-                        _nutri[_item] = _info
-                    _time.sleep(0.25)   # 레이트 리밋 방지
+                _targets = _menu_items[:9]
+                _total = len(_targets)
+                prog = st.progress(0, text=f"영양성분 DB 병렬 조회 중... (0/{_total})")
+                _done_count = 0
+                with ThreadPoolExecutor(max_workers=5) as _ex:
+                    _fmap = {_ex.submit(_fetch_nutrition_curl, it): it for it in _targets}
+                    for _fut in as_completed(_fmap):
+                        _item = _fmap[_fut]
+                        _done_count += 1
+                        prog.progress(_done_count / _total,
+                                      text=f"조회 중... ({_done_count}/{_total}) {_item}")
+                        try:
+                            _info = _fut.result()
+                            if _info:
+                                _nutri[_item] = _info
+                        except Exception:
+                            pass
                 prog.empty()
                 st.session_state[_t4_nutri_key] = _nutri
                 if not _nutri:
