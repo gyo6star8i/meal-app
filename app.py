@@ -1717,6 +1717,7 @@ with tab4:
                 _nutri = {}
                 _targets = _menu_items[:9]
                 _total = len(_targets)
+                _note = st.caption("💡 정확히 일치하는 메뉴명이 없을 경우 유사한 대표 메뉴로 조회됩니다. 카드의 (괄호)가 실제 DB 조회명입니다.")
                 prog = st.progress(0, text=f"영양성분 DB 병렬 조회 중... (0/{_total})")
                 _done_count = 0
                 with ThreadPoolExecutor(max_workers=5) as _ex:
@@ -1725,7 +1726,7 @@ with tab4:
                         _item = _fmap[_fut]
                         _done_count += 1
                         prog.progress(_done_count / _total,
-                                      text=f"조회 중... ({_done_count}/{_total}) {_item}")
+                                      text=f"조회 중... ({_done_count}/{_total}) {_item}  ·  일치 메뉴 없을 시 유사 메뉴로 대체됩니다")
                         try:
                             _info = _fut.result()
                             if _info:
@@ -1748,8 +1749,8 @@ with tab4:
                 expanded=True,
             ):
                 st.caption(
-                    "📊 출처: 식품의약품안전처 통합식품영양성분 DB (data.go.kr) · "
-                    "1인 1회 제공량 기준"
+                    "📊 출처: 식품의약품안전처 통합식품영양성분 DB (data.go.kr) · 1인 1회 제공량 기준  "
+                    "· 💡 괄호 안은 실제 DB 조회명 — 정확히 일치하는 메뉴명이 없을 경우 유사한 대표 메뉴로 조회됩니다"
                 )
                 def _nutri_card(food, info):
                     """영양성분 카드 HTML 생성"""
