@@ -1435,80 +1435,52 @@ with tab4:
         )
 
         def _extract_items(data: dict) -> list:
-            """한국 공공 OpenAPI 응답 형식 통합 파싱
-            - 형식A (apis.data.go.kr): {"response":{"body":{"items":[...]}}}
-            - 형식B (apis.data.go.kr): {"response":{"body":{"items":{"item":[...]}}}}
-            - 형식C (apis.data.go.kr): {"response":{"body":{"items":{"item":{...}}}}}
-            - 형식D (api.data.go.kr):  {"data":[{"FOOD_NM":...,"ENERC":...}], ...}
-            """
-            # 형식A/B/C (apis.data.go.kr 구 형식)
+            """api.data.go.kr 응답 파싱: {"response":{"body":{"items":[...]}}}"""
             body = (data.get("response") or {}).get("body") or {}
             raw = body.get("items")
-            if raw:
-                if isinstance(raw, list):
-                    return raw
-                if isinstance(raw, dict):
-                    inner = raw.get("item")
-                    if isinstance(inner, list):
-                        return inner
-                    if isinstance(inner, dict):
-                        return [inner]
-            # 형식D (api.data.go.kr 신형식 – 필드명 대문자 → 소문자 변환)
-            raw2 = data.get("data")
-            if isinstance(raw2, list) and raw2:
-                def _norm(item):
-                    return {
-                        "foodNm":  item.get("FOOD_NM")  or item.get("foodNm", ""),
-                        "enerc":   item.get("ENERC")    or item.get("enerc", ""),
-                        "prot":    item.get("PROT")     or item.get("prot", ""),
-                        "fatce":   item.get("FAT")      or item.get("fatce", ""),
-                        "chocdf":  item.get("CHO")      or item.get("chocdf", ""),
-                        "fibtg":   item.get("DIETFIBER") or item.get("fibtg", ""),
-                        "ca":      item.get("CA")       or item.get("ca", ""),
-                        "nat":     item.get("NA")       or item.get("nat", ""),
-                        "vitc":    item.get("VITC")     or item.get("vitc", ""),
-                    }
-                return [_norm(i) for i in raw2]
+            if not raw:
+                return []
+            if isinstance(raw, list):
+                return raw
+            if isinstance(raw, dict):
+                inner = raw.get("item")
+                if isinstance(inner, list):
+                    return inner
+                if isinstance(inner, dict):
+                    return [inner]
             return []
 
         def _do_query(name: str) -> dict:
             if len(name) < 2:
                 return {}
             encoded = urllib.parse.quote(name)
-            # 엔드포인트 1: apis.data.go.kr (구 형식, 소문자 필드명)
-            url_old = (
-                "https://apis.data.go.kr/1471000/FoodNtrCpntDbInfo01/getFoodNtrCpntDbInfonList"
-                f"?serviceKey={NUTRI_API_KEY}&pageNo=1&numOfRows=5&type=json&foodNm={encoded}"
-            )
-            # 엔드포인트 2: api.data.go.kr (신 형식, 대문자 필드명)
-            url_new = (
+            url = (
                 "https://api.data.go.kr/openapi/tn_pubr_public_nutri_food_info_api"
                 f"?serviceKey={NUTRI_API_KEY}&pageNo=1&numOfRows=5&type=json&foodNm={encoded}"
             )
             import requests as _req, urllib3 as _u3
             _u3.disable_warnings(_u3.exceptions.InsecureRequestWarning)
-            for url in [url_old, url_new]:
-                # 방법 1: requests
-                try:
-                    r = _req.get(url, verify=False, timeout=8)
-                    if r.status_code == 200:
-                        items = _extract_items(r.json())
-                        if items:
-                            return items[0]
-                except Exception:
-                    pass
-                # 방법 2: curl (학교 SSL 프록시 환경 폴백)
-                try:
-                    result = subprocess.run(
-                        ["curl", "-k", "-s", "--max-time", "8", url],
-                        capture_output=True, text=True, timeout=12,
-                    )
-                    if result.stdout:
-                        items = _extract_items(_json.loads(result.stdout))
-                        if items:
-                            return items[0]
-                except Exception:
-                    pass
+            # 방법 1: requests (Streamlit Cloud / 일반 환경)
+            try:
+                r = _req.get(url, verify=False, timeout=8)
+                if r.status_code == 200:
+                    items = _extract_items(r.json())
+                    if items:
+                        return items[0]
+            except Exception:
+                pass
+            # 방법 2: curl 폴백 (학교 SSL 프록시 환경)
+            try:
+                result = subprocess.run(
+                    ["curl", "-k", "-s", "--max-time", "8", url],
+                    capture_output=True, text=True, timeout=12,
+                )
+                if result.stdout:
+                    items = _extract_items(_json.loads(result.stdout))
+                    if items:
+                        return items[0]
+            except Exception:
+                pass
             return {}
 
         # ② 동의어/유사어 매핑 (API에 없는 음식을 가장 유사한 DB 항목으로 매핑)
