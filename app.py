@@ -1052,25 +1052,25 @@ with tab2:
     monday = st.session_state.week_monday
     friday = monday + timedelta(days=4)
 
-    w1, w2, w3 = st.columns([1.2, 4, 1.2])
+    w1, w2, w3, w4 = st.columns([1.2, 3.8, 0.9, 1.2])
     with w1:
         if st.button("◀ 이전 주", use_container_width=True, key="w_prev"):
             st.session_state.week_monday -= timedelta(weeks=1)
             st.rerun()
     with w2:
         st.markdown(
-            f"<h3 style='text-align:center;color:{clr};margin:0;line-height:2.2;'>"
+            f"<h3 style='text-align:center;color:{clr};margin:0;line-height:1.5;padding:6px 0;'>"
             f"📋 {monday.strftime('%Y년 %m월 %d일')} ~ {friday.strftime('%m월 %d일')}</h3>",
             unsafe_allow_html=True,
         )
     with w3:
+        if st.button("이번 주로", use_container_width=True, key="w_today"):
+            st.session_state.week_monday = _today - timedelta(days=_today.weekday())
+            st.rerun()
+    with w4:
         if st.button("다음 주 ▶", use_container_width=True, key="w_next"):
             st.session_state.week_monday += timedelta(weeks=1)
             st.rerun()
-
-    if st.button("이번 주로", key="w_today"):
-        st.session_state.week_monday = _today - timedelta(days=_today.weekday())
-        st.rerun()
 
     st.markdown("---")
 
