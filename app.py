@@ -549,7 +549,13 @@ with st.sidebar:
         sel_name = st.selectbox("학교 선택", school_options, index=default_i)
         sel_school_obj = next(s for s in filtered if s["name"] == sel_name)
 
-        st.caption(f"검색 결과: {len(filtered)}개" + (" (최대 300개 표시)" if len(candidates) > 300 and not query.strip() else ""))
+        st.markdown(
+            f"<p style='font-size:12px;color:#888;margin:2px 0 4px 0;'>"
+            f"검색 결과: {len(filtered)}개"
+            + (" (최대 300개 표시)" if len(candidates) > 300 and not query.strip() else "")
+            + "</p>",
+            unsafe_allow_html=True,
+        )
 
         if st.button("✅ 이 학교로 보기", use_container_width=True, type="primary"):
             st.session_state.school = sel_school_obj.copy()
@@ -564,10 +570,12 @@ with st.sidebar:
     st.markdown(
         f"<div style='background:{color}22;border-left:3px solid {color};"
         f"border-radius:6px;padding:8px 12px;'>"
-        f"<b style='color:{color};'>현재 학교</b><br>{sc['name']}</div>",
+        f"<b style='color:{color};font-size:12px;'>현재 학교</b><br>"
+        f"<span style='font-size:14px;font-weight:600;'>{sc['name']}</span><br>"
+        f"<span style='font-size:11px;color:#999;'>NEIS 학교급식 공개 API 제공</span>"
+        f"</div>",
         unsafe_allow_html=True,
     )
-    st.caption("NEIS 학교급식 공개 API 제공")
 
 # ──────────────────────────────────────────────────────────
 # 메인 영역
