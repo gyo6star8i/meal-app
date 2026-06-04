@@ -458,8 +458,8 @@ st.markdown("""
         gap: 4px !important;
         padding: 4px 8px 6px !important;
     }
-    /* 블록 사이 gap 줄이기 */
-    [data-testid="stVerticalBlock"] { gap: 0.4rem !important; }
+    /* 메인 콘텐츠 블록 gap만 축소 (사이드바 제외) */
+    section.main [data-testid="stVerticalBlock"] { gap: 0.4rem !important; }
 
     /* ── 탭 스타일 커스터마이징 ── */
     [data-baseweb="tab-list"] {
@@ -550,7 +550,7 @@ with st.sidebar:
         sel_school_obj = next(s for s in filtered if s["name"] == sel_name)
 
         st.markdown(
-            f"<p style='font-size:12px;color:#888;margin:2px 0 4px 0;'>"
+            f"<p style='font-size:12px;color:#888;margin:4px 0 10px 0;'>"
             f"검색 결과: {len(filtered)}개"
             + (" (최대 300개 표시)" if len(candidates) > 300 and not query.strip() else "")
             + "</p>",
