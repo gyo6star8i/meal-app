@@ -442,12 +442,12 @@ st.markdown("""
 
     /* ── 상단 여백 압축 ── */
     .block-container {
-        padding-top: 0.6rem !important;
+        padding-top: 2rem !important;
         padding-bottom: 1rem !important;
     }
-    /* 앱 제목 크기 축소 */
-    h1 { font-size: 1.4rem !important; margin: 0 0 2px 0 !important; line-height: 1.6 !important; overflow: visible !important; }
-    /* 부제목 크기 축소 */
+    /* 앱 제목: 글자 안 잘리도록 line-height 건드리지 않고 폰트·마진만 조정 */
+    h1 { font-size: 1.45rem !important; margin-bottom: 2px !important; }
+    /* 부제목 */
     h1 + p, .stMarkdown p { margin-top: 0 !important; margin-bottom: 4px !important; }
     /* expander 내부 패딩 축소 */
     [data-testid="stExpander"] details { padding: 0 !important; }
@@ -458,9 +458,8 @@ st.markdown("""
         gap: 4px !important;
         padding: 4px 8px 6px !important;
     }
-    /* 헤더와 탭 사이 간격 */
-    [data-testid="stVerticalBlock"] > [data-testid="stVerticalBlockBorderWrapper"],
-    [data-testid="stVerticalBlock"] > div { margin-bottom: 0 !important; }
+    /* 블록 사이 gap 줄이기 */
+    [data-testid="stVerticalBlock"] { gap: 0.4rem !important; }
 
     /* ── 탭 스타일 커스터마이징 ── */
     [data-baseweb="tab-list"] {
@@ -578,7 +577,7 @@ clr = school_color(school)
 
 # 헤더
 st.markdown(
-    f"<h1 style='color:{clr};margin:0 0 1px 0;font-size:1.4rem;line-height:1.6;overflow:visible;'>"
+    f"<h1 style='color:{clr};margin:0 0 2px 0;font-size:1.45rem;'>"
     f"🍱 {school['name']} 급식알리미</h1>"
     f"<p style='color:#aaa;margin:0 0 6px 0;font-size:12px;'>"
     f"BY LEE YANG-HO &amp; HEE-MYEONG · NEIS 급식 공개 API</p>",
