@@ -442,11 +442,11 @@ st.markdown("""
 
     /* ── 상단 여백 압축 ── */
     .block-container {
-        padding-top: 1rem !important;
+        padding-top: 0.6rem !important;
         padding-bottom: 1rem !important;
     }
     /* 앱 제목 크기 축소 */
-    h1 { font-size: 1.4rem !important; margin: 0 0 2px 0 !important; line-height: 1.3 !important; }
+    h1 { font-size: 1.4rem !important; margin: 0 0 2px 0 !important; line-height: 1.6 !important; overflow: visible !important; }
     /* 부제목 크기 축소 */
     h1 + p, .stMarkdown p { margin-top: 0 !important; margin-bottom: 4px !important; }
     /* expander 내부 패딩 축소 */
@@ -578,7 +578,7 @@ clr = school_color(school)
 
 # 헤더
 st.markdown(
-    f"<h1 style='color:{clr};margin:0 0 1px 0;font-size:1.4rem;line-height:1.3;'>"
+    f"<h1 style='color:{clr};margin:0 0 1px 0;font-size:1.4rem;line-height:1.6;overflow:visible;'>"
     f"🍱 {school['name']} 급식알리미</h1>"
     f"<p style='color:#aaa;margin:0 0 6px 0;font-size:12px;'>"
     f"BY LEE YANG-HO &amp; HEE-MYEONG · NEIS 급식 공개 API</p>",
