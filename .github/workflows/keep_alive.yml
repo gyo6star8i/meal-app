@@ -1,0 +1,14 @@
+name: Keep Alive
+
+on:
+  schedule:
+    - cron: "*/25 * * * *"   # 25분마다 실행
+  workflow_dispatch:           # 수동 실행 가능
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Streamlit App
+        run: |
+          curl -s -o /dev/null -w "%{http_code}" https://meal-app-rxcc7ptln9uw3qxpmypsb8.streamlit.app/ || true
