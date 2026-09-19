@@ -1284,10 +1284,10 @@ for s in SCHOOL_LIST:
     SCHOOL_BY_OFFICE[s["office"]].append(s)
 SCHOOL_BY_OFFICE["전체"] = SCHOOL_LIST[:]
 
-# ───────── 기본 학교: 신동초등학교(경북) ─────────
-_default = next((s for s in SCHOOL_LIST if s["_raw_name"] == "신동초등학교" and s["office"] == "R10"), None)
+# ───────── 기본 학교: 구미초등학교(경북) ─────────
+_default = next((s for s in SCHOOL_LIST if s["_raw_name"] == "구미초등학교" and s["office"] == "R10"), None)
 if _default is None:
-    _default = next((s for s in SCHOOL_LIST if "신동초등학교" in s["name"] and s["office"] == "R10"), None)
+    _default = next((s for s in SCHOOL_LIST if "구미초등학교" in s["name"] and s["office"] == "R10"), None)
 DEFAULT_SCHOOL = _default if _default else SCHOOL_BY_TYPE["초등학교"][0]
 
 API_KEY  = "9bffa2116eb747c18a082f5e52617d37"
