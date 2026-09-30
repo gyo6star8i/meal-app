@@ -915,7 +915,7 @@ def _call_groq(api_key: str, prompt: str, max_tokens: int = 1024) -> str:
     resp = _rq.post(
         "https://api.groq.com/openai/v1/chat/completions",
         headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
-        json={"model": "llama-3.3-70b-versatile",
+        json={"model": "openai/gpt-oss-20b",
               "messages": [{"role": "user", "content": prompt}],
               "max_tokens": max_tokens},
         verify=False, timeout=30,
@@ -1165,7 +1165,7 @@ with tab2:
                     f"white-space:pre-line;'>"
                     f"{st.session_state[_report_cache_key]}</div>"
                     f"<div style='margin-top:8px;font-size:12px;color:#aaa;'>"
-                    f"🤖 Groq AI (llama-3.3-70b) 분석 · 참고용 정보입니다</div>"
+                    f"🤖 Groq AI (GPT-OSS 20B) 분석 · 참고용 정보입니다</div>"
                     f"</div>",
                     unsafe_allow_html=True,
                 )
@@ -2565,4 +2565,4 @@ with tab6:
                     unsafe_allow_html=True,
                 )
 
-            st.caption("🤖 Groq AI (llama-3.3-70b) · 한국교육개발원 통계 기반 · 참고용 정보입니다")
+            st.caption("🤖 Groq AI (GPT-OSS 20B) · 한국교육개발원 통계 기반 · 참고용 정보입니다")
