@@ -2,13 +2,52 @@ name: Keep Alive
 
 on:
   schedule:
-    - cron: "*/25 * * * *"   # 25분마다 실행
-  workflow_dispatch:           # 수동 실행 가능
+    - cron: "17 * * * *"   # 매시 17분 (GitHub 지연으로 실제 간격은 더 길 수 있음)
+  workflow_dispatch:
 
 jobs:
-  ping:
+  wake:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
-      - name: Ping Streamlit App
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Playwright
         run: |
-          curl -s -o /dev/null -w "%{http_code}" https://meal-app-rxcc7ptln9uw3qxpmypsb8.streamlit.app/ || true
+          pip install playwright
+          python -m playwright install --with-deps chromium
+
+      # curl은 웹소켓 연결이 없어 Streamlit이 방문으로 인정하지 않으므로 실제 브라우저로 접속
+      - name: Visit app and wake if sleeping
+        run: |
+          python - <<'EOF'
+          from playwright.sync_api import sync_playwright
+
+          URL = "https://meal-app-rxcc7ptln9uw3qxpmypsb8.streamlit.app/"
+          WAKE = "Yes, get this app back up!"
+
+          with sync_playwright() as p:
+              browser = p.chromium.launch()
+              page = browser.new_page()
+              page.goto(URL, wait_until="domcontentloaded", timeout=60000)
+              page.wait_for_timeout(8000)
+
+              clicked = False
+              for frame in page.frames:
+                  btn = frame.get_by_role("button", name=WAKE)
+                  if btn.count():
+                      btn.first.click()
+                      clicked = True
+                      break
+
+              if clicked:
+                  print("App was asleep -> wake button clicked")
+                  page.wait_for_timeout(120000)
+              else:
+                  print("App is awake")
+                  page.wait_for_timeout(20000)
+
+              browser.close()
+          EOF
