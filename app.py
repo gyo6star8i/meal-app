@@ -909,16 +909,21 @@ with tab1:
 # ──────────────────────────────────────────────────────────
 # Groq AI 유틸 (Tab2 자동 리포트 · Tab4 AI 분석 공용)
 # ──────────────────────────────────────────────────────────
-def _call_groq(api_key: str, prompt: str, max_tokens: int = 1024) -> str:
+def _call_groq(api_key: str, prompt: str, max_tokens: int = 1024, json_mode: bool = False) -> str:
     import requests as _rq, urllib3 as _u3
     _u3.disable_warnings(_u3.exceptions.InsecureRequestWarning)
+    body = {"model": "openai/gpt-oss-20b",
+            "messages": [{"role": "user", "content": prompt}],
+            # gpt-oss는 추론 토큰도 한도에 포함되어 답변이 잘리므로 여유분 추가
+            "max_tokens": max_tokens + 2048,
+            "reasoning_effort": "low"}
+    if json_mode:
+        body["response_format"] = {"type": "json_object"}
     resp = _rq.post(
         "https://api.groq.com/openai/v1/chat/completions",
         headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
-        json={"model": "openai/gpt-oss-20b",
-              "messages": [{"role": "user", "content": prompt}],
-              "max_tokens": max_tokens},
-        verify=False, timeout=30,
+        json=body,
+        verify=False, timeout=60,
     )
     resp.raise_for_status()
     return resp.json()["choices"][0]["message"]["content"].strip()
@@ -970,7 +975,7 @@ def _analyze_meal_with_ai(menu: str, school_type: str, api_key: str, health_cont
 }}"""
 
     try:
-        raw = _call_groq(api_key, prompt, max_tokens=1024)
+        raw = _call_groq(api_key, prompt, max_tokens=1024, json_mode=True)
         if "```json" in raw:
             raw = raw.split("```json")[1].split("```")[0].strip()
         elif "```" in raw:
@@ -1011,7 +1016,7 @@ def _weekly_shopping_with_ai(week_meals: dict, school_type: str, api_key: str) -
 급식 없는 날은 빈 배열로 두세요. 각 요일마다 3~4가지 재료를 추천해주세요."""
 
     try:
-        raw = _call_groq(api_key, prompt, max_tokens=1024)
+        raw = _call_groq(api_key, prompt, max_tokens=1024, json_mode=True)
         if "```json" in raw:
             raw = raw.split("```json")[1].split("```")[0].strip()
         elif "```" in raw:
@@ -2496,7 +2501,7 @@ with tab6:
 
             with st.spinner("🤖 체력 데이터와 급식을 종합 분석 중..."):
                 try:
-                    _raw = _call_groq(_ns_ai_key, _ns_prompt, max_tokens=1200)
+                    _raw = _call_groq(_ns_ai_key, _ns_prompt, max_tokens=1200, json_mode=True)
                     if "```json" in _raw:
                         _raw = _raw.split("```json")[1].split("```")[0].strip()
                     elif "```" in _raw:
